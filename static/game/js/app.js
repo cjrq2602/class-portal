@@ -1814,8 +1814,16 @@ function initGameButtons() {
     };
 
     // 退出游戏到主菜单（游戏界面 HUD）
+    // 用双击确认代替 confirm()（移动端 confirm 可能被拦截或体验差）
+    let quitArm = false;
     $("#btn-quit-game").onclick = async () => {
-        if (!confirm("确定退出本局游戏？将返回主菜单。")) return;
+        if (!quitArm) {
+            quitArm = true;
+            toast("再点一次 🏠 确认退出", "warn", 2000);
+            setTimeout(() => { quitArm = false; }, 2000);
+            return;
+        }
+        quitArm = false;
         await api("/api/game/leave", { code: S.roomCode });
         leaveToMenu();
     };

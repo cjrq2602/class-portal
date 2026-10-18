@@ -95,19 +95,24 @@ def advance_state(state: dict[str, Any], ts: float) -> bool:
 def _advance_phase(state: dict[str, Any], ts: float) -> bool:
     """阶段状态机：prep → battle → break → battle … → victory/defeat。"""
     changed: bool = False
-    # 循环处理极端迟到请求（如封顶补算后阶段已过期很久）
-    while ts >= float(state["phase_end_at"]):
+    # 单次请求最多推进一个阶段转换，防止长时间离开后一次跳多波
+    max_transitions = 1
+    transitions = 0
+    while ts >= float(state["phase_end_at"]) and transitions < max_transitions:
         phase: str = state["phase"]
         if phase == "prep":
             _start_battle(state, ts)
             changed = True
+            transitions += 1
         elif phase == "battle":
             # 战斗时间到但怪没清完：剩余怪直接算漏掉（波次强制收束，防拖死 CPU）
             _resolve_battle_end(state, forced=True)
             changed = True
+            transitions += 1
         elif phase == "break":
             _start_prep(state, ts)
             changed = True
+            transitions += 1
         else:
             break
         if state["phase"] in ("victory", "defeat"):

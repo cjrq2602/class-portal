@@ -22,7 +22,7 @@ import time
 from datetime import timedelta
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, Response, g, jsonify, render_template_string, request, session
+from flask import Flask, Response, g, jsonify, redirect, render_template_string, request, session
 
 import common
 import db
@@ -108,6 +108,23 @@ def create_app() -> Flask:
     app.config["STATIC_V"] = _static_v()
 
     _setup_logging(app)
+
+    # ---- 强制 HTTPS（PythonAnywhere 反向代理，需检查 X-Forwarded-Proto） ----
+    # 线上 SESSION_COOKIE_SECURE=True，若用户用 http:// 访问，cookie 不会被
+    # 浏览器保存 → session 每次为空 → CSRF 校验必败。此处把所有 GET 请求重定向到 https。
+    @app.before_request
+    def _force_https():
+        if os.environ.get("PORTAL_INSECURE_COOKIE") == "1":
+            return None  # 本地 http 开发不强制
+        if request.path.startswith("/static/"):
+            return None  # 静态资源不重定向（避免多余跳转）
+        proto = request.headers.get("X-Forwarded-Proto", "http")
+        if proto != "https":
+            if request.method == "GET":
+                return redirect(f"https://{request.host}{request.full_path}", code=301)
+            # POST/PUT 等不重定向（会丢 body），直接拒绝让用户刷新
+            return common.err("请使用 https:// 访问本网站", "insecure", 400)
+        return None
 
     # ---- 请求计时 + 会话时限（CSRF 之前执行，保证被锁会话尽早登出） ----
     @app.before_request

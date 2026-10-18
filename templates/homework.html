@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% set active_page = "homework" %}
+{% block title %}作业追踪 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="flex-between flex-wrap gap-12">
+        <h2>📚 作业追踪</h2>
+        <span class="hw-privacy-note">🔒 完成状态仅自己可见</span>
+    </div>
+    <p class="text-muted mt-8" style="font-size:var(--fs-12)">
+        剩余不足 24 小时会橙色描边提醒；过期作业置灰标记。勾选"我已完成"只保存在你自己的账号里，
+        <b>任何其他同学和任何接口都看不到你的完成情况</b>。
+    </p>
+    <div class="chips mt-16" id="hw-filters"></div>
+</section>
+
+<div id="hw-list" class="mt-16"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/homework.js?v={{ static_v }}"></script>
+{% endblock %}

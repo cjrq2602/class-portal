@@ -1,0 +1,66 @@
+/* ============================================================
+   tokens.css —— 设计令牌（四期沿用，不得另行发明）
+   亮色为默认主题；深色覆盖见 dark.css（[data-theme="dark"]）。
+   命名规则：--c-* 品牌/语义色；--g-* 中性灰 10 档；--fs-* 字号；
+             --sp-* 间距；--r-* 圆角；--shadow-* 阴影；--dur-* 动效。
+   ============================================================ */
+:root {
+    /* ---- 品牌色 ---- */
+    --c-primary: #4F6EF7;
+    --c-primary-hover: #3D5CE5;
+    --c-primary-active: #3250D0;
+    --grad-brand: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+
+    /* ---- 语义色 ---- */
+    --c-success: #10B981;
+    --c-warning: #F59E0B;
+    --c-danger: #EF4444;
+    --c-info: #3B82F6;
+
+    /* ---- 中性灰 10 档（slate 系） ---- */
+    --g-50: #F8FAFC;  --g-100: #F1F5F9; --g-200: #E2E8F0; --g-300: #CBD5E1;
+    --g-400: #94A3B8; --g-500: #64748B; --g-600: #475569; --g-700: #334155;
+    --g-800: #1E293B; --g-900: #0F172A;
+
+    /* ---- 语义别名（dark.css 只覆盖这一层，组件不直接引用 --g-*） ---- */
+    --bg-page: var(--g-50);          /* 页面底 */
+    --bg-card: #FFFFFF;              /* 卡片底 */
+    --bg-elevated: #FFFFFF;          /* 浮层底（modal/toast/下拉） */
+    --bg-input: #FFFFFF;             /* 输入框底 */
+    --bg-hover: var(--g-100);        /* 悬停底 */
+    --text-1: var(--g-900);          /* 主文本 */
+    --text-2: var(--g-500);          /* 次要文本 */
+    --text-3: var(--g-400);          /* 弱化文本/占位 */
+    --border-1: var(--g-200);        /* 常规描边 */
+    --border-2: var(--g-300);        /* 强调描边 */
+    --nav-bg: rgba(255, 255, 255, 0.72);   /* 导航毛玻璃底 */
+    --overlay: rgba(15, 23, 42, 0.45);     /* modal 遮罩 */
+
+    /* ---- 字号（数字统一等宽） ---- */
+    --fs-12: 12px; --fs-14: 14px; --fs-16: 16px; --fs-18: 18px;
+    --fs-22: 22px; --fs-28: 28px; --fs-36: 36px;
+    --font-nums: "tabular-nums";           /* 配合 font-variant-numeric 使用 */
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+    /* ---- 间距 ---- */
+    --sp-8: 8px; --sp-12: 12px; --sp-16: 16px;
+    --sp-24: 24px; --sp-32: 32px; --sp-48: 48px;
+
+    /* ---- 圆角 ---- */
+    --r-8: 8px; --r-12: 12px; --r-16: 16px; --r-999: 999px;
+
+    /* ---- 阴影 ---- */
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.14);
+
+    /* ---- 动效 ---- */
+    --dur-fast: 150ms;
+    --dur-mid: 250ms;
+    --dur-slow: 400ms;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ---- 焦点环 ---- */
+    --focus-ring: 0 0 0 3px rgba(79, 110, 247, 0.35);
+}

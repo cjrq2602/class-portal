@@ -1,0 +1,41 @@
+/* ============================================================
+   dark.css —— 深色模式：[data-theme="dark"] 覆盖全部语义变量
+   组件层只消费语义变量（--bg-*/--text-*/--border-*），
+   因此这里只需覆盖变量即可全站换肤（含游戏页面外壳）。
+   切换逻辑：theme.js（localStorage 记忆 + prefers-color-scheme 默认）
+   ============================================================ */
+[data-theme="dark"] {
+    --bg-page: #0B0F19;
+    --bg-card: #131A2A;
+    --bg-elevated: #182136;
+    --bg-input: #0F1524;
+    --bg-hover: rgba(148, 163, 184, 0.1);
+
+    --text-1: #E6EAF2;
+    --text-2: #9AA7BD;
+    --text-3: #64748B;
+
+    --border-1: rgba(148, 163, 184, 0.16);
+    --border-2: rgba(148, 163, 184, 0.3);
+
+    --nav-bg: rgba(11, 15, 25, 0.72);
+    --overlay: rgba(2, 6, 16, 0.62);
+
+    /* 深色下主色略提亮保证对比度 */
+    --c-primary: #6C85FA;
+    --c-primary-hover: #8299FB;
+    --c-primary-active: #5A73E8;
+    --focus-ring: 0 0 0 3px rgba(108, 133, 250, 0.4);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+
+    color-scheme: dark;  /* 滚动条/表单控件跟随深色 */
+}
+
+/* 主题切换按钮的日/月图标状态 */
+#theme-toggle .icon-sun { display: none; }
+#theme-toggle .icon-moon { display: inline-block; }
+[data-theme="dark"] #theme-toggle .icon-sun { display: inline-block; }
+[data-theme="dark"] #theme-toggle .icon-moon { display: none; }

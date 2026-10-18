@@ -1,0 +1,3 @@
+# 守夜小队 —— 纯 Python 依赖（PythonAnywhere 免费版可直接 pip install）
+# 只依赖 Flask；其传递依赖 Werkzeug/Jinja2/itsdangerous/click/blinker 均为纯 Python。
+Flask==3.0.3

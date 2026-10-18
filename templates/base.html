@@ -1,0 +1,159 @@
+<!doctype html>
+<!-- ============================================================
+     base.html —— 门户基础布局（顶栏 + 下拉分组 + 内容区 + 手机底部 Tab）
+     导航条目全部来自 blocks.py 注册表，后续步骤加板块只需改 blocks.py。
+     ============================================================ -->
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="theme-color" content="#0B0F19">
+    {% block head_extra %}{% endblock %}
+    <title>{% block title %}守夜广场 · 班级门户{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/tokens.css?v={{ static_v }}">
+    <link rel="stylesheet" href="/static/css/base.css?v={{ static_v }}">
+    <link rel="stylesheet" href="/static/css/components.css?v={{ static_v }}">
+    <link rel="stylesheet" href="/static/css/dark.css?v={{ static_v }}">
+    <!-- 主题脚本放 head：先于渲染应用深色模式，避免闪屏 -->
+    <script src="/static/js/icons.js?v={{ static_v }}"></script>
+    <script src="/static/js/theme.js?v={{ static_v }}"></script>
+</head>
+<body>
+
+<!-- ================= 顶部导航（桌面≥1024 毛玻璃固定栏） ================= -->
+<header class="nav">
+    <div class="nav__inner">
+        <a class="nav__logo" href="/">
+            <span class="nav__logo-mark" id="logo-mark"></span>
+            守夜广场
+        </a>
+
+        <nav class="nav__links" id="nav-links">
+            {% for b in nav_top %}
+            <a class="nav__link {% if active_page == b.key %}nav__link--active{% endif %}"
+               href="{{ b.href }}" data-nav-icon="{{ b.icon }}">{{ b.name }}</a>
+            {% endfor %}
+
+            {# 学习▾ / 生活▾ / 互动▾ 下拉分组（桌面 hover / 键盘 focus 展开） #}
+            {% for g in nav_groups %}
+            <div class="nav__drop">
+                <button class="nav__link" data-nav-icon="{{ g.icon }}" type="button">
+                    {{ g.name }}<span class="nav__caret" data-caret="1"></span>
+                </button>
+                <div class="nav__drop-menu">
+                    {% for b in g.links %}
+                    <a class="nav__drop-item" href="{{ b.href }}">
+                        <span data-drop-icon="{{ b.icon }}"></span>{{ b.name }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if 'admin.access' in nav_perms %}
+            <a class="nav__link {% if active_page == 'admin' %}nav__link--active{% endif %}"
+               href="/admin" data-nav-icon="shield">管理后台</a>
+            {% endif %}
+        </nav>
+        <div class="nav__actions">
+            <button class="nav__icon-btn" id="theme-toggle" title="切换深色模式" aria-label="切换深色模式"></button>
+            {% if nav_user %}
+                <a class="nav__link" href="/me" id="nav-user-chip" title="{{ nav_user.username }}"></a>
+            {% else %}
+                <a class="btn btn--primary btn--sm" href="/login">登录</a>
+            {% endif %}
+            <!-- 平板/手机汉堡（<1024 显示） -->
+            <button class="nav__icon-btn nav__burger" id="nav-burger" aria-label="打开菜单"></button>
+        </div>
+    </div>
+
+    <!-- 汉堡展开菜单（平板 768~1023）：一级 + 分组全部平铺 -->
+    <div class="nav__mobile-menu" id="nav-mobile-menu">
+        {% for b in nav_top %}
+        <a class="nav__link" href="{{ b.href }}">{{ b.name }}</a>
+        {% endfor %}
+        {% for g in nav_groups %}
+        <div class="nav__mobile-group" data-group-title="{{ g.name }}"></div>
+        {% for b in g.links %}
+        <a class="nav__link nav__link--sub" href="{{ b.href }}">{{ b.name }}</a>
+        {% endfor %}
+        {% endfor %}
+        <a class="nav__link" href="/me">我的</a>
+        {% if 'admin.access' in nav_perms %}
+        <a class="nav__link" href="/admin">管理后台</a>
+        {% endif %}
+    </div>
+</header>
+
+<!-- ================= 内容区 ================= -->
+<main class="page-body">
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</main>
+
+<!-- ================= 手机底部 Tab 栏（<768，触控目标≥44px） ================= -->
+<nav class="tabbar" id="tabbar">
+    {% for b in nav_tabs %}
+    <a class="tabbar__item {% if active_page == b.key %}tabbar__item--active{% endif %}"
+       href="{{ b.href }}" data-tab-icon="{{ b.icon }}">{{ b.name }}{% if b.key == 'me' and nav_unread_updates %}<span class="tab-dot" aria-label="有未读更新"></span>{% endif %}</a>
+    {% endfor %}
+    {% if 'admin.access' in nav_perms %}
+    <a class="tabbar__item {% if active_page == 'admin' %}tabbar__item--active{% endif %}"
+       href="/admin" data-tab-icon="shield">管理</a>
+    {% endif %}
+</nav>
+
+<script src="/static/js/components.js?v={{ static_v }}"></script>
+<script src="/static/js/fx.js?v={{ static_v }}"></script>
+<script src="/static/js/sfx.js?v={{ static_v }}"></script>
+<script src="/static/js/utils/confetti.js?v={{ static_v }}"></script>
+<script src="/static/js/bgm.js?v={{ static_v }}"></script>
+<script nonce="{{ csp_nonce }}">
+/* 导航小脚本：图标注入 + 汉堡菜单 + 用户头像芯片 */
+(function () {
+    var mark = document.getElementById("logo-mark");
+    if (mark) mark.innerHTML = icon("shield", 16);
+    document.querySelectorAll("[data-nav-icon]").forEach(function (a) {
+        a.insertAdjacentHTML("afterbegin", icon(a.dataset.navIcon, 17));
+    });
+    document.querySelectorAll("[data-caret]").forEach(function (s) {
+        s.outerHTML = icon("chevron-down", 14);
+    });
+    document.querySelectorAll("[data-drop-icon]").forEach(function (s) {
+        s.outerHTML = icon(s.dataset.dropIcon, 16);
+    });
+    document.querySelectorAll("[data-tab-icon]").forEach(function (a) {
+        a.insertAdjacentHTML("afterbegin", icon(a.dataset.tabIcon, 20));
+    });
+    /* 移动端菜单里的分组标题 */
+    document.querySelectorAll("[data-group-title]").forEach(function (el) {
+        el.className = "nav__mobile-title";
+        el.textContent = el.dataset.groupTitle;
+    });
+    var burger = document.getElementById("nav-burger");
+    var menu = document.getElementById("nav-mobile-menu");
+    if (burger && menu) {
+        burger.innerHTML = icon("menu", 20);
+        burger.addEventListener("click", function () {
+            var open = menu.classList.toggle("is-open");
+            burger.innerHTML = icon(open ? "x" : "menu", 20);
+        });
+    }
+    var chip = document.getElementById("nav-user-chip");
+    if (chip) {
+        {% if nav_user %}
+        chip.innerHTML = avatarHtml({{ nav_user.nickname|tojson }}, "avatar--sm") +
+            "<span>" + {{ nav_user.nickname|tojson }} + "</span>";
+        {% if nav_unread_updates %}
+        /* 第六期小红点：有未读网站更新时钉在头像芯片右上角 */
+        chip.insertAdjacentHTML("beforeend", '<span class="nav-dot" aria-label="有未读更新"></span>');
+        {% endif %}
+        {% endif %}
+    }
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

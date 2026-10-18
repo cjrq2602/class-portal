@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% set active_page = "resources" %}
+{% block title %}学习资料库 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="flex-between flex-wrap gap-12">
+        <h2>📁 学习资料库</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)">
+            单文件 ≤{{ max_file_mb }}MB · 全站配额 400MB
+        </span>
+    </div>
+    <div id="res-storage" class="mt-12"></div>
+
+    <div class="chips mt-16" id="res-filters"></div>
+
+    {# 上传区：未登录时由 JS 替换为登录引导 #}
+    {% if logged_in %}
+    <div id="res-compose">
+        <form id="res-form" class="mt-8" data-max-mb="{{ max_file_mb }}"
+              enctype="multipart/form-data">
+            <div class="grid" style="gap:var(--sp-12)">
+                <div class="col-6">
+                    <div class="field">
+                        <label class="field__label" for="res-title">标题</label>
+                        <input class="input" id="res-title" maxlength="80" placeholder="如：高等数学第三章课件">
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="field">
+                        <label class="field__label" for="res-subject">学科</label>
+                        <select class="input" id="res-subject">
+                            {% for s in subjects %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="field">
+                        <label class="field__label" for="res-mode">类型</label>
+                        <select class="input" id="res-mode">
+                            <option value="link">外部链接</option>
+                            <option value="file">上传文件</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field" id="res-link-field">
+                <label class="field__label" for="res-link">链接地址</label>
+                <input class="input" id="res-link" placeholder="https://…">
+            </div>
+
+            <div class="field hidden" id="res-file-field">
+                <label class="field__label" for="res-file">选择文件</label>
+                <input class="input" id="res-file" type="file"
+                       accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.png,.jpg,.jpeg">
+                <div class="field__hint" id="res-file-hint">
+                    允许 pdf / doc(x) / ppt(x) / xls(x) / txt / zip / png / jpg；
+                    图片会自动在你浏览器里压缩（最长边 1280、质量 0.7）后再上传。
+                </div>
+            </div>
+
+            <button class="btn btn--primary" id="res-submit" type="submit">上传资料</button>
+        </form>
+    </div>
+    {% else %}
+    <div id="res-compose" class="mt-16"><!-- 由 JS 填充登录引导 --></div>
+    {% endif %}
+</section>
+
+<div id="res-list" class="mt-16"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/upload.js?v={{ static_v }}"></script>
+<script src="/static/js/resources.js?v={{ static_v }}"></script>
+{% endblock %}

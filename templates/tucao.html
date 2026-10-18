@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% set active_page = "hub" %}
+{% block title %}吐槽墙 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="digest-card__head">
+        <h2>💬 吐槽墙</h2>
+        <span class="flex gap-8">
+            <span class="tag" id="mode-tag">
+                {{ '先发后审' if mode == 'post_first' else '先审后发' }}
+            </span>
+            <button class="chip" data-sort="time" id="sort-time">最新</button>
+            <button class="chip" data-sort="hot" id="sort-hot">最热</button>
+        </span>
+    </div>
+    <p class="text-muted" style="font-size:var(--fs-12)">
+        每页 20 楼 · 单帖 ≤{{ max_content }} 字 · 身份可选（真实昵称 / 随机马甲 / 固定匿名）
+        · 含不合适词汇会被拦截 · 每人每分钟最多 3 帖
+    </p>
+</section>
+
+<!-- ===== 发帖区（未登录显示登录引导） ===== -->
+{% if logged_in %}
+<div class="compose mt-16">
+    <div class="persona-row" id="persona-row">
+        <label class="persona-opt"><input type="radio" name="persona" value="anon" checked>随机马甲</label>
+        <label class="persona-opt"><input type="radio" name="persona" value="real">真实昵称</label>
+        <label class="persona-opt"><input type="radio" name="persona" value="fixed">固定匿名</label>
+    </div>
+    <textarea class="input" id="tucao-input" data-max="{{ max_content }}"
+              maxlength="{{ max_content }}" placeholder="说点什么…（≤{{ max_content }} 字）"></textarea>
+    <div class="flex-between mt-8">
+        <span class="field__count" id="tucao-count">0 / {{ max_content }}</span>
+        <button class="btn btn--primary btn--sm" id="tucao-submit">发布</button>
+    </div>
+    {% if mode == 'audit_first' %}
+    <p class="text-faint mt-8" style="font-size:var(--fs-12)">
+        当前为「先审后发」模式：发布后需管理员审核通过才公开，审核期间你自己可以看到。
+    </p>
+    {% endif %}
+</div>
+{% else %}
+<div class="compose mt-16">
+    <div class="empty">
+        <span class="empty__art"></span>
+        <div class="empty__text">登录后才能发帖、点赞和举报（浏览无需登录）</div>
+        <div class="flex gap-12">
+            <a class="btn btn--primary" href="/login">登录</a>
+            <a class="btn btn--outline" href="/register">注册</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ===== 楼列表 ===== -->
+<div id="tucao-list" class="mt-16"></div>
+<div class="flex-between flex-wrap gap-12 mt-16">
+    <span class="text-faint" style="font-size:var(--fs-12)" id="tucao-total"></span>
+    <div id="tucao-pager"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">window.__TUCAO__ = { logged_in: {{ 'true' if logged_in else 'false' }},
+                           mode: {{ mode|tojson }}, max_content: {{ max_content }} };</script>
+<script src="/static/js/tucao.js?v={{ static_v }}"></script>
+{% endblock %}

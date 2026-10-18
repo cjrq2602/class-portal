@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% set active_page = "me" %}
+{% block title %}个人中心 · 守夜广场{% endblock %}
+
+{% block content %}
+{% if not me %}
+<!-- 未登录引导 -->
+<div class="card mt-32" style="max-width:460px;margin-left:auto;margin-right:auto">
+    <div class="empty">
+        <span class="empty__art" id="me-empty-art"></span>
+        <div class="empty__text">登录后查看个人信息、打卡日历与战绩</div>
+        <div class="flex gap-12">
+            <a class="btn btn--primary" href="/login">登录</a>
+            <a class="btn btn--outline" href="/register">注册</a>
+        </div>
+    </div>
+</div>
+{% else %}
+
+<!-- ============ 个人信息 + 四个统计 ============ -->
+<div class="grid mt-8">
+    <div class="col-4">
+        <div class="card text-center" style="padding:var(--sp-24)">
+            <div id="me-avatar"></div>
+            <h2 class="mt-12" id="me-nickname">{{ me.nickname }}</h2>
+            <div class="text-muted" style="font-size:var(--fs-12)">@{{ me.username }}</div>
+            <div class="mt-12"><span class="tag tag--primary">{{ me.role_display }}</span></div>
+            <div class="text-faint mt-16" style="font-size:var(--fs-12)">
+                注册于 {{ created_str }}（北京时间）
+            </div>
+        </div>
+    </div>
+
+    <div class="col-8">
+        <div class="me-stats">
+            <div class="me-stat">
+                <div class="me-stat__num num">{{ game_games }}</div>
+                <div class="me-stat__label">游戏局数</div>
+                <div class="me-stat__sub">{{ game_wins }} 胜 · {{ win_rate }}% 胜率</div>
+            </div>
+            <div class="me-stat">
+                <div class="me-stat__num num">{{ checkin_days }}</div>
+                <div class="me-stat__label">本月打卡</div>
+                <div class="me-stat__sub">累计 {{ checkin_total }} 天</div>
+            </div>
+            <div class="me-stat">
+                <div class="me-stat__num num" id="me-res-count">—</div>
+                <div class="me-stat__label">我上传的资料</div>
+                <div class="me-stat__sub" id="me-res-size">—</div>
+            </div>
+            <div class="me-stat">
+                <div class="me-stat__num num">{{ quote_approved }}</div>
+                <div class="me-stat__label">我的句子已通过</div>
+                <div class="me-stat__sub">{{ quote_pending }} 句待审</div>
+            </div>
+        </div>
+
+        <!-- 设置 -->
+        <div class="card mt-16">
+            <div class="card__title">⚙️ 设置</div>
+            <div class="field">
+                <label class="field__label">深色模式</label>
+                <div class="flex gap-8" style="align-items:center">
+                    <button class="btn btn--outline btn--sm theme-toggle">切换深色 / 浅色</button>
+                    <span class="text-faint" style="font-size:var(--fs-12)">
+                        偏好保存在本机，全站生效</span>
+                </div>
+            </div>
+            <div class="field">
+                <label class="field__label" for="me-nick-input">修改昵称</label>
+                <div class="flex gap-8 flex-wrap">
+                    <input class="input" id="me-nick-input" maxlength="12"
+                           value="{{ me.nickname }}" style="max-width:220px">
+                    <button class="btn btn--primary btn--sm" id="me-nick-save">保存昵称</button>
+                </div>
+            </div>
+            <form id="pwd-form" class="mt-16">
+                <div class="card__title">🔑 修改密码</div>
+                <div class="field">
+                    <label class="field__label" for="pwd-old">原密码</label>
+                    <input class="input" id="pwd-old" type="password" autocomplete="current-password">
+                </div>
+                <div class="field">
+                    <label class="field__label" for="pwd-new">新密码（≥6 位）</label>
+                    <input class="input" id="pwd-new" type="password" autocomplete="new-password">
+                </div>
+                <div class="field">
+                    <label class="field__label" for="pwd-new2">确认新密码</label>
+                    <input class="input" id="pwd-new2" type="password" autocomplete="new-password">
+                </div>
+                <button class="btn btn--primary" type="submit">保存新密码</button>
+            </form>
+        </div>
+
+        <!-- 退出 -->
+        <div class="card mt-16 flex-between flex-wrap gap-12">
+            <div class="text-muted">退出当前账号（游戏匿名进度保留在本机）</div>
+            <button class="btn btn--danger" id="btn-logout">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ part6：网站动态（全用户可见：更新入口带红点/凭码改密/已读记录） ============ -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>📣 网站动态</h2>
+        <a class="btn btn--ghost btn--sm" href="/updates">全部更新</a>
+    </div>
+    <div class="me-quick">
+        <a class="me-quick__item" href="/updates">
+            <span class="me-quick__icon" data-mq-icon="megaphone" style="background:var(--grad-brand)"></span>
+            <div style="min-width:0">
+                <b>网站更新{% if unread_updates %}
+                    <span class="tag tag--danger num">{{ unread_updates }} 未读</span>{% endif %}</b>
+                <div class="text-muted" style="font-size:var(--fs-12)">预告 · 通知 · 版本更新</div>
+            </div>
+        </a>
+        <a class="me-quick__item" href="/reset-password">
+            <span class="me-quick__icon" data-mq-icon="key" style="background:#0EA5E9"></span>
+            <div style="min-width:0">
+                <b>凭重置码改密</b>
+                <div class="text-muted" style="font-size:var(--fs-12)">忘记密码？找管理员要 8 位码</div>
+            </div>
+        </a>
+    </div>
+    <details class="mt-16" id="me-reads-box">
+        <summary class="me-reads__summary">我的已读更新记录</summary>
+        <div id="me-reads" class="mt-8"></div>
+    </details>
+</section>
+
+{% if is_admin %}
+<!-- ============ part6：管理快捷区（按权限动态显示；移动端 2 列宫格） ============ -->
+<section class="card mt-16">
+    <div class="card__title">🛡️ 管理快捷区</div>
+    <div class="me-quick">
+        {% if 'update.manage' in me_perms %}
+        <a class="me-quick__item" href="#panel-updates">
+            <span class="me-quick__icon" data-mq-icon="megaphone" style="background:var(--grad-brand)"></span>
+            <div style="min-width:0">
+                <b>网站更新管理</b>
+                <div class="text-muted" style="font-size:var(--fs-12)">预告 / 通知 / 更新发布</div>
+            </div>
+        </a>
+        {% endif %}
+        {% if 'user.manage' in me_perms %}
+        <a class="me-quick__item" href="#panel-resetcode">
+            <span class="me-quick__icon" data-mq-icon="key" style="background:#F59E0B"></span>
+            <div style="min-width:0">
+                <b>账号管理 · 重置码</b>
+                <div class="text-muted" style="font-size:var(--fs-12)">为同学生成改密重置码</div>
+            </div>
+        </a>
+        {% endif %}
+        {% if 'announcement.manage' in me_perms %}
+        <a class="me-quick__item" href="/admin#announcements">
+            <span class="me-quick__icon" data-mq-icon="edit" style="background:#3B82F6"></span>
+            <div style="min-width:0"><b>公告发布</b>
+                <div class="text-muted" style="font-size:var(--fs-12)">直达后台公告模块</div></div>
+        </a>
+        {% endif %}
+        {% if 'tucao.moderate' in me_perms %}
+        <a class="me-quick__item" href="/admin#tucao">
+            <span class="me-quick__icon" data-mq-icon="message" style="background:#EC4899"></span>
+            <div style="min-width:0"><b>吐槽审核</b>
+                <div class="text-muted" style="font-size:var(--fs-12)">直达后台吐槽模块</div></div>
+        </a>
+        {% endif %}
+        {% if 'activity.manage' in me_perms %}
+        <a class="me-quick__item" href="/admin#activities">
+            <span class="me-quick__icon" data-mq-icon="calendar" style="background:#8B5CF6"></span>
+            <div style="min-width:0"><b>活动发布</b>
+                <div class="text-muted" style="font-size:var(--fs-12)">直达后台活动模块</div></div>
+        </a>
+        {% endif %}
+        {% if 'homework.manage' in me_perms %}
+        <a class="me-quick__item" href="/admin#homework">
+            <span class="me-quick__icon" data-mq-icon="file-text" style="background:#14B8A6"></span>
+            <div style="min-width:0"><b>作业发布</b>
+                <div class="text-muted" style="font-size:var(--fs-12)">直达后台作业模块</div></div>
+        </a>
+        {% endif %}
+    </div>
+</section>
+{% endif %}
+
+{% if 'update.manage' in me_perms %}
+<!-- ============ part6：网站更新管理面板（update.manage） ============ -->
+<section class="card mt-16" id="panel-updates">
+    <div class="digest-card__head">
+        <h2>📣 网站更新管理</h2>
+        <button class="btn btn--primary btn--sm" id="upd-new">＋ 新建</button>
+    </div>
+    <div id="upd-admin-list"></div>
+</section>
+{% endif %}
+
+{% if 'user.manage' in me_perms %}
+<!-- ============ part6：账号管理 · 重置码面板（user.manage） ============ -->
+<section class="card mt-16" id="panel-resetcode">
+    <div class="card__title">🔑 账号管理 · 密码重置码</div>
+    <p class="text-muted" style="font-size:var(--fs-12)">
+        同学忘记密码时，在这里为他生成 8 位一次性重置码（15 分钟内有效）。
+        码只显示一次，请立即转达本人；不能给超级管理员或本人生成。
+    </p>
+    <div class="flex gap-8 mt-8">
+        <input class="input" id="rc-kw" placeholder="搜索用户名 / 昵称" style="max-width:240px">
+        <button class="btn btn--outline btn--sm" id="rc-search">搜索</button>
+    </div>
+    <div id="rc-results" class="mt-8"></div>
+</section>
+{% endif %}
+
+<!-- ============ 我的打卡月历 ============ -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>📅 我的打卡日历</h2>
+        <div class="flex gap-8">
+            <button class="btn btn--ghost btn--sm" id="me-ck-prev">‹ 上月</button>
+            <button class="btn btn--ghost btn--sm" id="me-ck-next">下月 ›</button>
+        </div>
+    </div>
+    <div id="me-calendar"></div>
+</section>
+
+<!-- ============ 我的资料上传 ============ -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>📁 我的资料上传</h2>
+        <a class="btn btn--ghost btn--sm" href="/resources">去资料库上传</a>
+    </div>
+    <div id="me-resources"></div>
+</section>
+
+<!-- ============ 我的投稿状态 ============ -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>💬 我的投稿</h2>
+        <a class="btn btn--ghost btn--sm" href="/quote">去每日一句投稿</a>
+    </div>
+    <div id="me-quotes"></div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if me %}
+<script nonce="{{ csp_nonce }}">window.__ME__ = { logged_in: true, today: {{ today|tojson }},
+    perms: {{ me_perms|tojson }}, unread_updates: {{ unread_updates }} };</script>
+<script src="/static/js/me.js?v={{ static_v }}"></script>
+{% else %}
+<script nonce="{{ csp_nonce }}">
+document.querySelectorAll(".empty__art").forEach(function (el) {
+    if (!el.innerHTML.trim()) el.innerHTML = icon("user", 46);
+});
+</script>
+{% endif %}
+{% endblock %}

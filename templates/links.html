@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% set active_page = "links" %}
+{% block title %}资源导航 · 守夜广场{% endblock %}
+
+{% block content %}
+<!-- 统一页头：页标题 + 副标题 + 右侧操作区（搜索框 + 推荐按钮） -->
+<div class="page-head">
+    <div>
+        <h1 class="page-head__title">🔗 资源导航</h1>
+        <div class="page-head__sub">
+            时政 · 学习 · 就业 · 行业 · 校园工具一键直达（全部新窗口打开）·
+            图标为彩色首字母方块，不加载任何外部资源
+        </div>
+    </div>
+    <div class="page-head__actions">
+        <input class="input links-search" id="links-search" type="search"
+               placeholder="搜索名称 / 简介 / 网址" aria-label="搜索链接">
+        {% if nav_user %}
+        <button class="btn btn--primary" id="link-sub-btn" type="button">推荐链接</button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 分类 Tab（全部 + 各分类，links.js 渲染） -->
+<nav class="chips" id="links-tabs" aria-label="链接分类"></nav>
+
+<!-- 卡片网格：骨架屏 → 链接卡片 / 空态"暂无链接" -->
+<div class="links-grid stagger" id="links-grid"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/links.js?v={{ static_v }}"></script>
+{% endblock %}

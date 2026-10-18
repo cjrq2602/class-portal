@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% set active_page = "login" %}
+{% block title %}登录 · 守夜广场{% endblock %}
+
+{% block content %}
+<div class="auth-card card panel-anim mt-32">
+    <h2 class="text-center mb-8">欢迎回来 👋</h2>
+    <p class="text-muted text-center mb-24" style="font-size:var(--fs-12)">
+        没有账号？<a href="/register">用邀请码注册</a>
+    </p>
+    <form id="login-form">
+        <div class="field">
+            <label class="field__label" for="login-username">用户名</label>
+            <input class="input" id="login-username" type="text" autocomplete="username"
+                   placeholder="3~20 位字母/数字/下划线" required>
+        </div>
+        <div class="field">
+            <label class="field__label" for="login-password">密码</label>
+            <input class="input" id="login-password" type="password" autocomplete="current-password"
+                   placeholder="请输入密码" required>
+        </div>
+        <button class="btn btn--primary btn--block btn--lg mt-8" id="login-submit" type="submit">登 录</button>
+    </form>
+    <p class="text-faint text-center mt-16" style="font-size:var(--fs-12)">
+        <a href="/reset-password">忘记密码？凭重置码修改</a><br>
+        连续输错 5 次将锁定 10 分钟 · 游客也可先玩游戏
+    </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("login-submit");
+    btn.classList.add("btn--loading");
+    try {
+        await fetchJSON("/api/auth/login", {
+            method: "POST",
+            body: {
+                username: document.getElementById("login-username").value.trim(),
+                password: document.getElementById("login-password").value,
+            },
+        });
+        Toast.show("登录成功", "success", 1200);
+        setTimeout(() => { location.href = "/"; }, 500);
+    } catch (err) { /* fetchJSON 已 Toast 报错 */ }
+    btn.classList.remove("btn--loading");
+});
+</script>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% set active_page = "news" %}
+{% block title %}新闻中心 · 守夜广场{% endblock %}
+
+{% block content %}
+<!-- 分段标签：时事新闻（本页） ⇄ 每日总结 -->
+<nav class="seg-tabs">
+    <a class="seg-tabs__item seg-tabs__item--active" href="/news"
+       data-seg-icon="file-text">时事新闻</a>
+    <a class="seg-tabs__item" href="/digest" data-seg-icon="clock">每日总结</a>
+</nav>
+
+<section class="card">
+    <div class="digest-card__head">
+        <h2>📰 时事新闻</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)" id="sync-note">
+            <!-- 数据更新时间 / 降级提示由 news.js 填充 -->
+        </span>
+    </div>
+
+    <!-- 来源筛选 chips（含"全部"） -->
+    <div class="chips" id="source-chips"></div>
+
+    <!-- 列表：骨架屏 → 新闻 / 空态 -->
+    <div id="news-list" class="stagger"></div>
+
+    <!-- 分页器 -->
+    <div class="mt-16 flex-between flex-wrap gap-12">
+        <span class="text-faint" style="font-size:var(--fs-12)" id="news-total"></span>
+        <div id="news-pager"></div>
+    </div>
+
+    <!-- 数据链路说明（透明化延迟来源） -->
+    <p class="text-faint mt-16" style="font-size:var(--fs-12);line-height:1.8">
+        数据来源：多源 RSS 经 GitHub Actions 每 20 分钟抓取一次 → 本站缓存 5 分钟后刷新，
+        因此<b>从源头发布到此处可见约需 20~25 分钟</b>。
+        抓取失败时本站自动降级展示旧数据（不会白屏），并在上方标注数据更新时间。
+    </p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/news.js?v={{ static_v }}"></script>
+{% endblock %}

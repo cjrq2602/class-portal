@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% set active_page = "duty" %}
+{% block title %}值日表 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="flex-between flex-wrap gap-12">
+        <h2>🧹 本周值日表</h2>
+        <div class="flex gap-8">
+            {% if can_manage %}
+            <button class="btn btn--outline btn--sm" id="duty-rotate">🔁 一键顺延轮换</button>
+            {% endif %}
+            <span class="text-faint" style="font-size:var(--fs-12);align-self:center">
+                今天整列高亮（按北京时间星期）
+            </span>
+        </div>
+    </div>
+    <div id="duty-today-bar" class="mt-16"></div>
+</section>
+
+<div class="duty-grid mt-16" id="duty-grid">
+    {# 服务端先渲染一版（无 JS 也能看到内容），JS 加载后再刷新 #}
+    {% for d in week %}
+    <div class="duty-col{% if d.day == today_dow %} duty-col--today{% endif %}">
+        <div class="duty-col__day">
+            {{ d.day_name }}{% if d.day == today_dow %}<span class="tag tag--primary">今天</span>{% endif %}
+        </div>
+        {% if d.has_data %}
+        <div class="duty-col__group">{{ d.group_name or "（未命名小组）" }}</div>
+        <div class="duty-col__members">{{ d.members or "—" }}</div>
+        {% if d.task %}<div class="duty-col__task">🧹 {{ d.task }}</div>{% endif %}
+        {% else %}
+        <div class="text-faint" style="font-size:var(--fs-12)">暂无安排</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/duty.js?v={{ static_v }}"></script>
+{% endblock %}

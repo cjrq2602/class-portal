@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% set active_page = "checkin" %}
+{% block title %}打卡挑战 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="flex-between flex-wrap gap-12">
+        <h2>🎯 打卡挑战</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)">
+            每天每挑战只能打卡 1 次 · 今天 {{ today }}
+        </span>
+    </div>
+    <details class="rules mt-12">
+        <summary>连续天数怎么算？（点开看规则）</summary>
+        <ul>
+            <li>今天打过卡 → 从今天往前数连续天数</li>
+            <li>今天还没打卡 → 从昨天往前数（今天内补上就不会断）</li>
+            <li>昨天也没打卡 → <b>连续天数清零</b>（断签清零）</li>
+            <li>每个挑战独立计算；挑战结束后自动归档，不再出现在进行中列表</li>
+        </ul>
+    </details>
+</section>
+
+<div id="ck-list" class="mt-16"></div>
+
+<!-- 排行榜 -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>🏆 班级排行榜</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)">按连续天数排序</span>
+    </div>
+    <div id="ck-board">
+        <div class="empty"><span class="empty__art"></span>
+            <div class="empty__text">选择一个挑战查看排行榜</div></div>
+    </div>
+</section>
+
+<!-- 月历热力图 -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>📅 我的打卡月历</h2>
+        <div class="flex gap-8">
+            <button class="btn btn--ghost btn--sm" id="ck-prev">‹ 上月</button>
+            <button class="btn btn--ghost btn--sm" id="ck-next">下月 ›</button>
+        </div>
+    </div>
+    <div id="ck-calendar"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">window.__CK__ = { logged_in: {{ 'true' if logged_in else 'false' }},
+                         today: {{ today|tojson }} };</script>
+<script src="/static/js/checkin.js?v={{ static_v }}"></script>
+{% endblock %}

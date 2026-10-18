@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% set active_page = "register" %}
+{% block title %}注册 · 守夜广场{% endblock %}
+
+{% block content %}
+<div class="auth-card card panel-anim mt-32">
+    <h2 class="text-center mb-8">加入守夜广场 🎉</h2>
+    <p class="text-muted text-center mb-24" style="font-size:var(--fs-12)">
+        注册需要邀请码（找管理员领取）· 已有账号 <a href="/login">去登录</a>
+    </p>
+    <form id="reg-form">
+        <div class="field">
+            <label class="field__label" for="reg-invite">邀请码</label>
+            <input class="input" id="reg-invite" type="text" placeholder="8 位邀请码" required
+                   style="text-transform:uppercase" maxlength="12">
+        </div>
+        <div class="field">
+            <label class="field__label" for="reg-username">用户名</label>
+            <input class="input" id="reg-username" type="text" autocomplete="username"
+                   placeholder="3~20 位字母/数字/下划线，用于登录" required maxlength="20">
+        </div>
+        <div class="field">
+            <label class="field__label" for="reg-nickname">昵称</label>
+            <input class="input" id="reg-nickname" type="text" maxlength="12"
+                   placeholder="展示给同学的昵称（≤12 字，游戏中自动使用）" required>
+            <div class="field__count" id="reg-nick-count"></div>
+        </div>
+        <div class="field">
+            <label class="field__label" for="reg-password">密码</label>
+            <input class="input" id="reg-password" type="password" autocomplete="new-password"
+                   placeholder="至少 8 位，须同时含字母和数字" required>
+        </div>
+        <div class="field">
+            <label class="field__label" for="reg-password2">确认密码</label>
+            <input class="input" id="reg-password2" type="password" autocomplete="new-password"
+                   placeholder="再输一遍密码" required>
+        </div>
+        <button class="btn btn--primary btn--block btn--lg mt-8" id="reg-submit" type="submit">注 册</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+bindCharCount(document.getElementById("reg-nickname"),
+              document.getElementById("reg-nick-count"));
+
+document.getElementById("reg-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const pwd = document.getElementById("reg-password").value;
+    const pwd2 = document.getElementById("reg-password2").value;
+    if (pwd !== pwd2) { Toast.show("两次输入的密码不一致", "danger"); return; }
+    const btn = document.getElementById("reg-submit");
+    btn.classList.add("btn--loading");
+    try {
+        await fetchJSON("/api/auth/register", {
+            method: "POST",
+            body: {
+                invite_code: document.getElementById("reg-invite").value.trim().toUpperCase(),
+                username: document.getElementById("reg-username").value.trim(),
+                nickname: document.getElementById("reg-nickname").value.trim(),
+                password: pwd,
+            },
+        });
+        Toast.show("注册成功，已自动登录", "success", 1500);
+        setTimeout(() => { location.href = "/"; }, 600);
+    } catch (err) { /* fetchJSON 已 Toast 报错 */ }
+    btn.classList.remove("btn--loading");
+});
+</script>
+{% endblock %}

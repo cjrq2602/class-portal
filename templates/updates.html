@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% set active_page = "updates" %}
+{% block title %}网站更新 · 守夜广场{% endblock %}
+
+{% block content %}
+<div class="page-head mt-16">
+    <div>
+        <h1 class="page-head__title">📣 网站更新</h1>
+        <p class="page-head__sub">预告 · 通知 · 版本更新，一站看全</p>
+    </div>
+</div>
+
+<!-- 顶部 Tab：全部 / 预告 / 通知 / 更新 -->
+<div class="chip-row mt-16" id="upd-tabs">
+    <button class="chip chip--active" data-utype="all">全部</button>
+    <button class="chip" data-utype="preview">预告</button>
+    <button class="chip" data-utype="notice">通知</button>
+    <button class="chip" data-utype="release">更新</button>
+</div>
+
+<div id="upd-list" class="mt-16"><!-- 骨架屏由 JS 注入 --></div>
+<div class="text-center mt-16" id="upd-more-box" style="display:none">
+    <button class="btn btn--outline" id="upd-more">加载更多</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/updates.js?v={{ static_v }}"></script>
+{% endblock %}

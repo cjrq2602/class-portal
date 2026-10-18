@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% set active_page = "quote" %}
+{% block title %}每日一句 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="flex-between flex-wrap gap-12">
+        <h2>💬 每日一句</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)">
+            每天按北京日期轮换一句 · 投稿需管理员审核
+        </span>
+    </div>
+
+    {# 今日一句：引用样式横幅 #}
+    <div class="quote-banner mt-16" id="quote-today">
+        <div class="skeleton skeleton--text"></div>
+    </div>
+
+    {# 投稿区（未登录显示登录引导） #}
+    {% if logged_in %}
+    <div class="compose mt-24">
+        <div class="flex-between flex-wrap gap-8">
+            <b>投稿一句</b>
+            <span class="field__count" id="quote-count">0 / {{ max_content }}</span>
+        </div>
+        <textarea class="input mt-8" id="quote-input" data-max="{{ max_content }}"
+                  maxlength="{{ max_content }}"
+                  placeholder="写点想对全班说的话（≤{{ max_content }} 字）"></textarea>
+        <div class="flex gap-8 mt-8 flex-wrap" style="align-items:center">
+            <input class="input" id="quote-author" maxlength="20"
+                   placeholder="署名（可留空 → 匿名同学）" style="max-width:220px">
+            <button class="btn btn--primary btn--sm" id="quote-submit">提交审核</button>
+        </div>
+        <div class="text-faint mt-8" style="font-size:var(--fs-12)">
+            提交后进入待审队列，管理员通过后才会出现在列表与首页（先审后显）。
+        </div>
+    </div>
+    {% else %}
+    <div class="compose mt-24">
+        <div class="empty">
+            <span class="empty__art"></span>
+            <div class="empty__text">登录后可投稿与点赞</div>
+            <div class="flex gap-12">
+                <a class="btn btn--primary" href="/login">登录</a>
+                <a class="btn btn--outline" href="/register">注册</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</section>
+
+<!-- 已审核句子列表（点赞降序） -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>🌟 全班句子</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)" id="quote-total"></span>
+    </div>
+    <div id="quote-list"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">window.__QUOTE__ = { logged_in: {{ 'true' if logged_in else 'false' }},
+                            max_content: {{ max_content }} };</script>
+<script src="/static/js/quote.js?v={{ static_v }}"></script>
+{% endblock %}

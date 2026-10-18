@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% set active_page = "hub" %}
+{% block title %}互动 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="digest-card__head">
+        <h2>🎯 互动板块</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)">已上线 {{ items|length }} 个</span>
+    </div>
+    <p class="text-muted" style="font-size:var(--fs-13)">
+        本页自动收录所有已上线的互动板块 —— 后续新增板块会自动出现在这里，无需改动本页面。
+    </p>
+</section>
+
+{% if items %}
+<div class="hub-grid mt-16">
+    {% for b in items %}
+    <a class="card card--hover hub-card" href="{{ b.href }}">
+        <span class="hub-card__icon" style="background:{{ b.color }}"
+              data-hub-icon="{{ b.icon }}"></span>
+        <div style="min-width:0">
+            <b style="font-size:var(--fs-16)">{{ b.name }}</b>
+            <div class="text-muted" style="font-size:var(--fs-12)">{{ b.desc }}</div>
+        </div>
+        <span class="text-faint" style="margin-left:auto" data-hub-arrow="1"></span>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card mt-16">
+    <div class="empty">
+        <span class="empty__art"></span>
+        <div class="empty__text">互动板块正在建设中</div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+document.querySelectorAll("[data-hub-icon]").forEach(function (el) {
+    el.innerHTML = icon(el.dataset.hubIcon, 26);
+});
+document.querySelectorAll("[data-hub-arrow]").forEach(function (el) {
+    el.innerHTML = icon("chevron-right", 18);
+});
+document.querySelectorAll(".empty__art").forEach(function (el) {
+    if (!el.innerHTML.trim()) el.innerHTML = icon("grid", 40);
+});
+</script>
+{% endblock %}

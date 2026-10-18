@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% set active_page = "picker" %}
+{% block title %}随机点名 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="flex-between flex-wrap gap-12">
+        <h2>🎲 随机点名</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)">
+            课堂抽人工具 · 名单 {{ 0 if not logged_in else '' }}在册人数见下
+        </span>
+    </div>
+    {% if not logged_in %}
+    <div class="empty mt-16">
+        <span class="empty__art"></span>
+        <div class="empty__text">登录后可使用随机点名</div>
+        <a class="btn btn--primary" href="/login">登录</a>
+    </div>
+    {% else %}
+    <div class="flex gap-16 flex-wrap mt-16" style="align-items:center">
+        <label class="persona-opt"><input type="checkbox" id="pk-exclude-drawn" checked>
+            排除已点过的</label>
+        <span class="text-faint" style="font-size:var(--fs-12)" id="pk-count">在册 0 人</span>
+        <span class="flex gap-8" style="margin-left:auto">
+            <button class="btn btn--ghost btn--sm" id="pk-fullscreen">⛶ 全屏</button>
+            <button class="btn btn--ghost btn--sm" id="pk-clear">清空本次记录</button>
+        </span>
+    </div>
+    {% endif %}
+</section>
+
+{% if logged_in %}
+<!-- 抽取舞台 -->
+<section class="picker-stage mt-16" id="pk-stage">
+    <div class="picker-name" id="pk-name">准备好了吗？</div>
+    <button class="btn btn--primary btn--lg" id="pk-draw">开始点名</button>
+    <div class="text-faint mt-8" style="font-size:var(--fs-12)" id="pk-hint">
+        抽中后会放大定格；首次点击会自动解锁鼓点音效
+    </div>
+</section>
+
+<!-- 请假勾选（本次排除） -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>🙋 本次请假（勾选后不参与抽取）</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)" id="pk-absent-count">已选 0 人</span>
+    </div>
+    <div class="chips" id="pk-roster"></div>
+</section>
+
+<!-- 本次会话历史 -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>📋 本次已点</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)" id="pk-history-count">0 人</span>
+    </div>
+    <div class="chips" id="pk-history"><span class="text-faint">还没有点过</span></div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if logged_in %}
+<script nonce="{{ csp_nonce }}">window.__PK__ = { can_manage: {{ 'true' if can_manage else 'false' }} };</script>
+<script src="/static/js/picker.js?v={{ static_v }}"></script>
+{% endif %}
+{% endblock %}

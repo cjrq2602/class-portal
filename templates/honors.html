@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% set active_page = "honors" %}
+{% block title %}荣誉墙 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="flex-between flex-wrap gap-12">
+        <h2>🏆 荣誉墙</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)">
+            置顶优先，其余按时间倒序
+        </span>
+    </div>
+
+    {# 管理端新增表单：无 honor.manage 权限时由 JS 隐藏 #}
+    <div id="honor-compose" class="hidden mt-16">
+        <form id="honor-form" data-max-mb="{{ max_image_mb }}" enctype="multipart/form-data">
+            <div class="grid" style="gap:var(--sp-12)">
+                <div class="col-6">
+                    <div class="field">
+                        <label class="field__label" for="honor-title">奖项名称</label>
+                        <input class="input" id="honor-title" maxlength="60" placeholder="如：校级合唱比赛一等奖">
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="field">
+                        <label class="field__label" for="honor-owner">获奖人 / 集体</label>
+                        <input class="input" id="honor-owner" maxlength="60" placeholder="如：班级合唱团">
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="field">
+                        <label class="field__label" for="honor-date">获奖日期</label>
+                        <input class="input" id="honor-date" maxlength="10" placeholder="YYYY-MM-DD">
+                    </div>
+                </div>
+            </div>
+            <div class="field">
+                <label class="field__label" for="honor-desc">描述</label>
+                <textarea class="input" id="honor-desc" maxlength="500" placeholder="可写获奖经过或感言"></textarea>
+            </div>
+            <div class="field">
+                <label class="field__label" for="honor-image">配图（可选，≤{{ max_image_mb }}MB）</label>
+                <input class="input" id="honor-image" type="file" accept=".png,.jpg,.jpeg">
+                <div class="field__hint" id="honor-image-hint">
+                    图片会在你浏览器里先压缩（最长边 1280、质量 0.7）再上传，服务端不做任何图像处理。
+                </div>
+            </div>
+            <button class="btn btn--primary" id="honor-submit" type="submit">添加荣誉</button>
+        </form>
+    </div>
+</section>
+
+<div id="honor-grid" class="mt-16"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/upload.js?v={{ static_v }}"></script>
+<script src="/static/js/honors.js?v={{ static_v }}"></script>
+{% endblock %}

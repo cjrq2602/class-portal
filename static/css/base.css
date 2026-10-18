@@ -1,0 +1,99 @@
+/* ============================================================
+   base.css —— reset / 排版 / 12 列栅格 / 断点 / 工具类
+   断点：<480 手机 · 480~767 大屏手机 · 768~1023 平板 · ≥1024 桌面
+   ============================================================ */
+
+/* ---- reset ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+    font-family: var(--font-family);
+    font-size: var(--fs-14);
+    line-height: 1.6;
+    color: var(--text-1);
+    background: var(--bg-page);
+    min-height: 100vh;
+    transition: background var(--dur-mid) var(--ease), color var(--dur-mid) var(--ease);
+}
+img, svg { display: inline-block; vertical-align: middle; }
+button, input, textarea, select { font: inherit; color: inherit; }
+a { color: var(--c-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+ul, ol { list-style: none; }
+h1 { font-size: var(--fs-28); line-height: 1.3; }
+h2 { font-size: var(--fs-22); line-height: 1.35; }
+h3 { font-size: var(--fs-18); line-height: 1.4; }
+.num, .tabular { font-variant-numeric: tabular-nums; }  /* 数字等宽 */
+
+/* ---- 容器与 12 列栅格 ---- */
+.container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 var(--sp-16); }
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--sp-16); }
+.col-1  { grid-column: span 1; }  .col-2  { grid-column: span 2; }
+.col-3  { grid-column: span 3; }  .col-4  { grid-column: span 4; }
+.col-5  { grid-column: span 5; }  .col-6  { grid-column: span 6; }
+.col-7  { grid-column: span 7; }  .col-8  { grid-column: span 8; }
+.col-9  { grid-column: span 9; }  .col-10 { grid-column: span 10; }
+.col-11 { grid-column: span 11; } .col-12 { grid-column: span 12; }
+
+/* 平板：栅格降为 6 列语义（原 ≥7 列的块换行） */
+@media (max-width: 1023px) {
+    .grid { grid-template-columns: repeat(6, 1fr); }
+    .col-7, .col-8, .col-9, .col-10, .col-11, .col-12 { grid-column: span 6; }
+    .col-4, .col-5 { grid-column: span 3; }
+}
+/* 手机：单列堆叠 */
+@media (max-width: 767px) {
+    .grid { grid-template-columns: 1fr; gap: var(--sp-12); }
+    [class^="col-"], [class*=" col-"] { grid-column: span 1; }
+}
+
+/* ---- 页面主区（给固定导航/底部 Tab 留白） ---- */
+.page-body { padding: 76px 0 32px; }
+@media (max-width: 767px) {
+    .page-body { padding: 64px 0 84px; }  /* 底部 Tab 栏占位 */
+}
+
+/* ---- 工具类 ---- */
+.hidden { display: none !important; }
+.text-muted { color: var(--text-2); }
+.text-faint { color: var(--text-3); }
+.text-danger { color: var(--c-danger); }
+.text-success { color: var(--c-success); }
+.text-center { text-align: center; }
+.mt-8 { margin-top: var(--sp-8); }   .mt-12 { margin-top: var(--sp-12); }
+.mt-16 { margin-top: var(--sp-16); } .mt-24 { margin-top: var(--sp-24); }
+.mt-32 { margin-top: var(--sp-32); }
+.mb-8 { margin-bottom: var(--sp-8); }  .mb-16 { margin-bottom: var(--sp-16); }
+.mb-24 { margin-bottom: var(--sp-24); }
+.flex { display: flex; align-items: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-8 { gap: var(--sp-8); } .gap-12 { gap: var(--sp-12); }
+.gap-16 { gap: var(--sp-16); } .gap-24 { gap: var(--sp-24); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- 列表入场 stagger 淡入（吐槽/新闻等列表通用） ---- */
+@keyframes rise-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.stagger > * {
+    animation: rise-in var(--dur-slow) var(--ease) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 60ms; }
+.stagger > *:nth-child(3) { animation-delay: 120ms; }
+.stagger > *:nth-child(4) { animation-delay: 180ms; }
+.stagger > *:nth-child(5) { animation-delay: 240ms; }
+.stagger > *:nth-child(6) { animation-delay: 300ms; }
+.stagger > *:nth-child(n+7) { animation-delay: 360ms; }
+
+/* ---- 无障碍：用户偏好减少动态效果时关闭全部动画 ---- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

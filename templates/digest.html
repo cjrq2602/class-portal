@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% set active_page = "digest" %}
+{% block title %}每日总结 · 守夜广场{% endblock %}
+
+{#
+  总结卡渲染宏：ok=已生成（渲染要点）；否则显示占位/空态
+  要点中的每条都带关联新闻引用（refs），点击可直达原文（新窗口 rel=noopener）
+#}
+{% macro digest_card(view, title, icon_name, accent) %}
+<div class="card">
+    <div class="digest-card__head">
+        <h2>{{ title }}</h2>
+        {% if view.exists %}
+        <span class="flex gap-8">
+            <span class="tag tag--primary">{{ view.date }}</span>
+            {% if view.edited %}
+            <span class="tag tag--warning">管理员已编辑</span>
+            {% elif view.generator == 'action' %}
+            <span class="tag tag--success">GitHub 定时生成</span>
+            {% elif view.generator == 'manual' %}
+            <span class="tag tag--info">手动重生成</span>
+            {% else %}
+            <span class="tag">站点兜底生成</span>
+            {% endif %}
+            {% if view.ai_enhanced %}<span class="tag tag--success">AI 润色</span>{% endif %}
+        </span>
+        {% endif %}
+    </div>
+
+    {% if view.exists %}
+        <div class="text-faint" style="font-size:var(--fs-12);margin-bottom:var(--sp-12)">
+            覆盖时段：{{ view.window_bj.start }} ~ {{ view.window_bj.end }}（北京时间）
+            · 纳入 <b class="num">{{ view.news_count }}</b> 条新闻
+            · 生成于 {{ view.updated_at }}
+        </div>
+
+        {% if view.points %}
+        <div class="stagger">
+            {% for p in view.points %}
+            <div class="digest-point">
+                <span class="digest-point__idx num">{{ loop.index }}</span>
+                <div style="min-width:0">
+                    <div>{{ p.text }}</div>
+                    {% if p.refs %}
+                    <div class="digest-point__refs">
+                        {% for r in p.refs %}
+                        <a class="digest-point__ref" href="{{ r.url }}" target="_blank"
+                           rel="noopener noreferrer">{{ r.source }}：{{ r.title[:24] }}…</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">
+            <span class="empty__art">{{ '' }}</span>
+            <div class="empty__text">该时段没有抓到新闻，暂无要点</div>
+        </div>
+        {% endif %}
+
+        {% if view.keywords %}
+        <div class="mt-16">
+            <div class="text-muted mb-8" style="font-size:var(--fs-12)">Top 关键词</div>
+            <div class="kw-list">
+                {% for k in view.keywords %}<span class="tag">{{ k }}</span>{% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="empty">
+            <span class="empty__art"></span>
+            <div class="empty__text">
+                {% if view.pending %}
+                    将于 {{ ready_at }} 更新（北京时间）
+                {% else %}
+                    暂无数据，稍后刷新即可
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<!-- 分段标签：时事新闻 ⇄ 每日总结（本页） -->
+<nav class="seg-tabs">
+    <a class="seg-tabs__item" href="/news" data-seg-icon="file-text">时事新闻</a>
+    <a class="seg-tabs__item seg-tabs__item--active" href="/digest" data-seg-icon="clock">每日总结</a>
+</nav>
+
+<!-- 时间规则说明（透明化 0 点/9 点两个产出时刻） -->
+<section class="card">
+    <div class="digest-card__head">
+        <h2>🗓️ 每天两份总结</h2>
+        <button class="btn btn--outline btn--sm" id="digest-refresh">刷新</button>
+    </div>
+    <p class="text-muted" style="font-size:var(--fs-13);line-height:1.9">
+        <b>北京时间 00:00</b> 生成【昨日总结】：覆盖昨天 00:00 ~ 24:00 全天新闻<br>
+        <b>北京时间 09:00</b> 生成【今日总结】：覆盖今天 00:00 ~ 09:00 的新闻<br>
+        <span class="text-faint" style="font-size:var(--fs-12)">
+            两份总结互不覆盖；0~9 点之间今日总结显示"将于 09:00 更新"占位。
+            若定时任务未产出，页面会自动兜底生成（幂等，只补一次）。
+        </span>
+    </p>
+</section>
+
+<div class="grid mt-16">
+    <div class="col-6">{{ digest_card(today, "☀️ 今日总结", "sun", "primary") }}</div>
+    <div class="col-6">{{ digest_card(yesterday, "🌙 昨日总结", "moon", "secondary") }}</div>
+</div>
+
+<!-- 历史归档：点击查看某日详情 -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>📚 历史归档</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)">共 {{ archive|length }} 份</span>
+    </div>
+    {% if archive %}
+    <div class="chips" id="archive-chips">
+        {% for a in archive %}
+        <button class="chip" data-type="{{ a.type }}" data-date="{{ a.date }}">
+            {{ a.date }} · {{ '今日' if a.type == 'today' else '昨日' }}
+            {% if a.edited %}✎{% endif %}
+        </button>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+        <span class="empty__art"></span>
+        <div class="empty__text">还没有历史总结</div>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/digest.js?v={{ static_v }}"></script>
+{% endblock %}

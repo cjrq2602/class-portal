@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% set active_page = "activities" %}
+{% block title %}活动与比赛 · 守夜广场{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="flex-between flex-wrap gap-12">
+        <h2>🎪 活动与比赛</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)">
+            状态由时间自动计算：未开始 → 报名中 → 报名截止 → 进行中 → 已结束
+        </span>
+    </div>
+    <div class="chips mt-16" id="act-filters"></div>
+</section>
+
+<div id="act-list" class="mt-16"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/activities.js?v={{ static_v }}"></script>
+{% endblock %}

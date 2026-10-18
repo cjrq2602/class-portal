@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/static/css/base.css?v={{ static_v }}">
     <link rel="stylesheet" href="/static/css/components.css?v={{ static_v }}">
     <link rel="stylesheet" href="/static/css/dark.css?v={{ static_v }}">
+    <link rel="stylesheet" href="/static/css/skins.css?v={{ static_v }}">
     <!-- 主题脚本放 head：先于渲染应用深色模式，避免闪屏 -->
     <script src="/static/js/icons.js?v={{ static_v }}"></script>
     <script src="/static/js/theme.js?v={{ static_v }}"></script>
@@ -58,6 +59,7 @@
         </nav>
         <div class="nav__actions">
             <button class="nav__icon-btn" id="theme-toggle" title="切换深色模式" aria-label="切换深色模式"></button>
+            <button class="nav__icon-btn" id="settings-toggle" title="设置" aria-label="打开设置"></button>
             {% if nav_user %}
                 <a class="nav__link" href="/me" id="nav-user-chip" title="{{ nav_user.username }}"></a>
             {% else %}
@@ -110,11 +112,106 @@
 <script src="/static/js/sfx.js?v={{ static_v }}"></script>
 <script src="/static/js/utils/confetti.js?v={{ static_v }}"></script>
 <script src="/static/js/bgm.js?v={{ static_v }}"></script>
+<!-- 语言转换：仅繁体模式生效，简体模式立即返回 -->
+<script src="/static/js/i18n.js?v={{ static_v }}"></script>
+
+<!-- ================= 设置抽屉（全站通用） ================= -->
+<div class="set-panel__bg" id="settings-backdrop"></div>
+<aside class="set-panel" id="settings-panel" aria-hidden="true" aria-label="外观与语言设置">
+    <div class="set-panel__head">
+        <h2>⚙️ 设置</h2>
+        <button class="nav__icon-btn" id="settings-close" aria-label="关闭设置"></button>
+    </div>
+    <div class="set-panel__body">
+
+        <!-- 明暗模式 -->
+        <div class="set-group">
+            <div class="set-group__title">外观模式</div>
+            <div class="set-seg">
+                <button class="set-seg__btn" data-set-mode="auto" type="button">跟随系统</button>
+                <button class="set-seg__btn" data-set-mode="light" type="button">浅色</button>
+                <button class="set-seg__btn" data-set-mode="dark" type="button">深色</button>
+            </div>
+        </div>
+
+        <!-- 皮肤包 -->
+        <div class="set-group">
+            <div class="set-group__title">皮肤包</div>
+            <div class="set-skins">
+                <button class="set-skin" data-set-skin="default" type="button">
+                    <span class="set-skin__dot" style="background:linear-gradient(135deg,#6366F1,#8B5CF6)"></span>
+                    <span class="set-skin__name">守夜蓝</span>
+                </button>
+                <button class="set-skin" data-set-skin="sakura" type="button">
+                    <span class="set-skin__dot" style="background:linear-gradient(135deg,#F472B6,#FB7185)"></span>
+                    <span class="set-skin__name">樱花粉</span>
+                </button>
+                <button class="set-skin" data-set-skin="forest" type="button">
+                    <span class="set-skin__dot" style="background:linear-gradient(135deg,#10B981,#34D399)"></span>
+                    <span class="set-skin__name">森林绿</span>
+                </button>
+                <button class="set-skin" data-set-skin="sunset" type="button">
+                    <span class="set-skin__dot" style="background:linear-gradient(135deg,#F97316,#FBBF24)"></span>
+                    <span class="set-skin__name">落日橙</span>
+                </button>
+                <button class="set-skin" data-set-skin="ocean" type="button">
+                    <span class="set-skin__dot" style="background:linear-gradient(135deg,#06B6D4,#3B82F6)"></span>
+                    <span class="set-skin__name">深海青</span>
+                </button>
+                <button class="set-skin" data-set-skin="mono" type="button">
+                    <span class="set-skin__dot" style="background:linear-gradient(135deg,#64748B,#94A3B8)"></span>
+                    <span class="set-skin__name">极简灰</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 语言 -->
+        <div class="set-group">
+            <div class="set-group__title">语言</div>
+            <div class="set-seg">
+                <button class="set-seg__btn" data-set-locale="zh-CN" type="button">简体中文</button>
+                <button class="set-seg__btn" data-set-locale="zh-TW" type="button">繁體中文</button>
+            </div>
+        </div>
+
+        <!-- 声音 -->
+        <div class="set-group">
+            <div class="set-group__title">声音</div>
+            <div class="set-row">
+                <div>
+                    <div class="set-row__label">操作音效</div>
+                    <div class="set-row__hint">点击、打卡、胜利等提示音</div>
+                </div>
+                <button class="set-switch" id="set-sfx" type="button" aria-label="音效开关"></button>
+            </div>
+            <div class="set-row">
+                <div>
+                    <div class="set-row__label">背景音乐</div>
+                    <div class="set-row__hint">在右下角音乐面板中开关与调音量</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="set-group">
+            <div class="set-group__title">关于</div>
+            <div class="set-row__hint" style="line-height:1.8">
+                守夜广场 · 班级门户<br>
+                主题与语言设置保存在本机浏览器，不影响其他同学。
+            </div>
+        </div>
+    </div>
+</aside>
+
 <script nonce="{{ csp_nonce }}">
 /* 导航小脚本：图标注入 + 汉堡菜单 + 用户头像芯片 */
 (function () {
     var mark = document.getElementById("logo-mark");
     if (mark) mark.innerHTML = icon("shield", 16);
+    /* 设置入口与关闭按钮 */
+    var setBtn = document.getElementById("settings-toggle");
+    if (setBtn) setBtn.innerHTML = icon("settings", 18);
+    var setClose = document.getElementById("settings-close");
+    if (setClose) setClose.innerHTML = icon("x", 18);
     document.querySelectorAll("[data-nav-icon]").forEach(function (a) {
         a.insertAdjacentHTML("afterbegin", icon(a.dataset.navIcon, 17));
     });

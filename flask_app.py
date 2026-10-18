@@ -56,6 +56,8 @@ def _static_v() -> str:
         "static/js/links.js", "static/js/utils/confetti.js",
         # 第六期新增前端资源
         "static/js/updates.js", "static/js/reset_password.js",
+        # 第七期：皮肤包 + 语言切换
+        "static/css/skins.css", "static/js/i18n.js",
     ]
     h = hashlib.md5()
     for rel in files:

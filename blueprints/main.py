@@ -49,8 +49,9 @@ def _home_public_data() -> dict[str, Any]:
     """
     news_rows, _news_total = portal_db.list_news(page=1, per_page=5)
     today_view: dict[str, Any] = digest_service.digest_view("today")
-    # 0~9 点今日总结尚未生成时，首页回退展示昨日总结，避免整卡空白
-    yesterday_view: dict[str, Any] = digest_service.digest_view("yesterday")
+    # 仅当今日总结缺失（0~9 点）时才查昨日总结，避免每次首页都多一次查询
+    yesterday_view: dict[str, Any] = (
+        {} if today_view.get("exists") else digest_service.digest_view("yesterday"))
 
     duty_row = portal_db.duty_today()
     duty_item: Optional[dict[str, Any]] = None

@@ -1,0 +1,244 @@
+/* ============================================================
+   skins.css —— 皮肤包（配色方案）
+   ============================================================
+   与「明暗模式」是两个维度：
+     data-theme = light / dark      （明暗，见 dark.css）
+     data-skin  = default / sakura / forest / sunset / ocean / mono
+   皮肤只覆盖品牌色与渐变，不动中性灰与语义色，保证对比度安全。
+   default 不写选择器，直接沿用 tokens.css 的守夜蓝。
+   ============================================================ */
+
+/* ---------------- 樱花粉 ---------------- */
+:root[data-skin="sakura"] {
+    --c-primary: #DB2777;
+    --c-primary-hover: #BE185D;
+    --c-primary-active: #9D174D;
+    --grad-brand: linear-gradient(135deg, #F472B6 0%, #FB7185 100%);
+    --focus-ring: 0 0 0 3px rgba(219, 39, 119, 0.32);
+}
+[data-theme="dark"][data-skin="sakura"] {
+    --c-primary: #F472B6;
+    --c-primary-hover: #F9A8D4;
+    --c-primary-active: #EC4899;
+    --grad-brand: linear-gradient(135deg, #EC4899 0%, #F43F5E 100%);
+    --focus-ring: 0 0 0 3px rgba(244, 114, 182, 0.38);
+}
+
+/* ---------------- 森林绿 ---------------- */
+:root[data-skin="forest"] {
+    --c-primary: #059669;
+    --c-primary-hover: #047857;
+    --c-primary-active: #065F46;
+    --grad-brand: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+    --focus-ring: 0 0 0 3px rgba(5, 150, 105, 0.32);
+}
+[data-theme="dark"][data-skin="forest"] {
+    --c-primary: #34D399;
+    --c-primary-hover: #6EE7B7;
+    --c-primary-active: #10B981;
+    --grad-brand: linear-gradient(135deg, #059669 0%, #10B981 100%);
+    --focus-ring: 0 0 0 3px rgba(52, 211, 153, 0.38);
+}
+
+/* ---------------- 落日橙 ---------------- */
+:root[data-skin="sunset"] {
+    --c-primary: #EA580C;
+    --c-primary-hover: #C2410C;
+    --c-primary-active: #9A3412;
+    --grad-brand: linear-gradient(135deg, #F97316 0%, #FBBF24 100%);
+    --focus-ring: 0 0 0 3px rgba(234, 88, 12, 0.32);
+}
+[data-theme="dark"][data-skin="sunset"] {
+    --c-primary: #FB923C;
+    --c-primary-hover: #FDBA74;
+    --c-primary-active: #F97316;
+    --grad-brand: linear-gradient(135deg, #EA580C 0%, #F59E0B 100%);
+    --focus-ring: 0 0 0 3px rgba(251, 146, 60, 0.38);
+}
+
+/* ---------------- 深海青 ---------------- */
+:root[data-skin="ocean"] {
+    --c-primary: #0891B2;
+    --c-primary-hover: #0E7490;
+    --c-primary-active: #155E75;
+    --grad-brand: linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%);
+    --focus-ring: 0 0 0 3px rgba(8, 145, 178, 0.32);
+}
+[data-theme="dark"][data-skin="ocean"] {
+    --c-primary: #22D3EE;
+    --c-primary-hover: #67E8F9;
+    --c-primary-active: #06B6D4;
+    --grad-brand: linear-gradient(135deg, #0891B2 0%, #3B82F6 100%);
+    --focus-ring: 0 0 0 3px rgba(34, 211, 238, 0.38);
+}
+
+/* ---------------- 极简灰 ---------------- */
+:root[data-skin="mono"] {
+    --c-primary: #475569;
+    --c-primary-hover: #334155;
+    --c-primary-active: #1E293B;
+    --grad-brand: linear-gradient(135deg, #64748B 0%, #94A3B8 100%);
+    --focus-ring: 0 0 0 3px rgba(71, 85, 105, 0.3);
+}
+[data-theme="dark"][data-skin="mono"] {
+    --c-primary: #94A3B8;
+    --c-primary-hover: #CBD5E1;
+    --c-primary-active: #64748B;
+    --grad-brand: linear-gradient(135deg, #475569 0%, #64748B 100%);
+    --focus-ring: 0 0 0 3px rgba(148, 163, 184, 0.35);
+}
+
+/* ============================================================
+   设置面板（全站通用，挂在 base.html）
+   ============================================================ */
+.set-panel {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: 340px;
+    max-width: 100vw;
+    /* 必须高于固定顶栏（z-index:1000），否则抽屉标题与关闭按钮被压住 */
+    z-index: 1300;
+    background: var(--bg-elevated);
+    border-left: 1px solid var(--border-1);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(100%);
+    transition: transform var(--dur-mid) var(--ease);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+.set-panel.is-open { transform: translateX(0); }
+.set-panel__head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--sp-16);
+    /* 顶栏高度（桌面 57px / 手机约 52px）+ 安全区，避免被遮挡 */
+    padding-top: calc(64px + env(safe-area-inset-top, 0px));
+    border-bottom: 1px solid var(--border-1);
+    flex-shrink: 0;
+}
+.set-panel__head h2 { font-size: var(--fs-16); font-weight: 700; }
+.set-panel__body {
+    padding: var(--sp-16);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+}
+.set-panel__bg {
+    position: fixed; inset: 0;
+    background: var(--overlay);
+    z-index: 1290;
+    opacity: 0; pointer-events: none;
+    transition: opacity var(--dur-mid) var(--ease);
+}
+.set-panel__bg.is-open { opacity: 1; pointer-events: auto; }
+
+.set-group { margin-bottom: var(--sp-24); }
+.set-group__title {
+    font-size: var(--fs-12);
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: var(--sp-8);
+    text-transform: none;
+}
+
+/* 分段选择（明暗模式 / 语言） */
+.set-seg {
+    display: flex; gap: 4px;
+    padding: 3px;
+    border-radius: var(--r-8);
+    background: var(--bg-hover);
+}
+.set-seg__btn {
+    flex: 1;
+    min-height: 38px;
+    border: none; border-radius: 6px;
+    background: transparent;
+    color: var(--text-2);
+    font-size: var(--fs-13);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.set-seg__btn.is-active {
+    background: var(--bg-card);
+    color: var(--text-1);
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+}
+
+/* 皮肤色卡 */
+.set-skins {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.set-skin {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 10px 6px;
+    min-height: 74px;
+    border: 2px solid transparent;
+    border-radius: var(--r-8);
+    background: var(--bg-hover);
+    cursor: pointer;
+    transition: border-color var(--dur-fast) var(--ease),
+                transform var(--dur-fast) var(--ease);
+}
+.set-skin:hover { transform: translateY(-1px); }
+.set-skin.is-active { border-color: var(--c-primary); }
+.set-skin__dot {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.set-skin__name {
+    font-size: var(--fs-12);
+    color: var(--text-2);
+}
+
+/* 开关行 */
+.set-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    padding: 6px 0;
+}
+.set-row__label { font-size: var(--fs-14); color: var(--text-1); }
+.set-row__hint { font-size: var(--fs-12); color: var(--text-3); margin-top: 2px; }
+
+.set-switch {
+    position: relative;
+    width: 46px; height: 26px;
+    flex-shrink: 0;
+    border: none; border-radius: 999px;
+    background: var(--border-2);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
+}
+.set-switch::after {
+    content: "";
+    position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform var(--dur-fast) var(--ease);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.set-switch.is-on { background: var(--c-primary); }
+.set-switch.is-on::after { transform: translateX(20px); }
+
+.set-range {
+    width: 100%;
+    accent-color: var(--c-primary);
+    margin-top: 4px;
+}
+
+/* 顶栏设置按钮 */
+.nav__icon-btn#settings-toggle { position: relative; }
+
+/* 手机：面板全屏宽 */
+@media (max-width: 480px) {
+    .set-panel { width: 100%; }
+    .set-skins { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .set-panel, .set-panel__bg { transition: none; }
+}

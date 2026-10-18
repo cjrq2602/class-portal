@@ -109,26 +109,19 @@ def create_app() -> Flask:
 
     _setup_logging(app)
 
-    # ---- 强制 HTTPS（PythonAnywhere 反向代理，需检查 X-Forwarded-Proto） ----
-    # 线上 SESSION_COOKIE_SECURE=True，若用户用 http:// 访问，cookie 不会被
-    # 浏览器保存 → session 每次为空 → CSRF 校验必败。此处把所有 GET 请求重定向到 https。
-    @app.before_request
-    def _force_https():
-        # 本地开发（localhost/127.0.0.1）或显式关闭时不强制 HTTPS
+    # ---- HSTS：告诉浏览器以后都用 HTTPS 访问（由 PA 的 SSL 证书保证） ----
+    # 不再做应用层重定向，避免循环重定向问题。PA 本身已支持强制 HTTPS。
+    # 本地开发（localhost/127.0.0.1）或显式关闭时不加 HSTS。
+    @app.after_request
+    def _hsts_header(resp: Response) -> Response:
         if os.environ.get("PORTAL_INSECURE_COOKIE") == "1":
-            return None
+            return resp
         host = request.host.split(":")[0]
         if host in ("localhost", "127.0.0.1", "0.0.0.0"):
-            return None
-        if request.path.startswith("/static/"):
-            return None  # 静态资源不重定向（避免多余跳转）
-        proto = request.headers.get("X-Forwarded-Proto", "http")
-        if proto != "https":
-            if request.method == "GET":
-                return redirect(f"https://{request.host}{request.full_path}", code=301)
-            # POST/PUT 等不重定向（会丢 body），直接拒绝让用户刷新
-            return common.err("请使用 https:// 访问本网站", "insecure", 400)
-        return None
+            return resp
+        # max-age=31536000 = 1 年；includeSubDomains 对所有子域生效
+        resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return resp
 
     # ---- 请求计时 + 会话时限（CSRF 之前执行，保证被锁会话尽早登出） ----
     @app.before_request

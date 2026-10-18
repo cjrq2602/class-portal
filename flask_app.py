@@ -114,8 +114,12 @@ def create_app() -> Flask:
     # 浏览器保存 → session 每次为空 → CSRF 校验必败。此处把所有 GET 请求重定向到 https。
     @app.before_request
     def _force_https():
+        # 本地开发（localhost/127.0.0.1）或显式关闭时不强制 HTTPS
         if os.environ.get("PORTAL_INSECURE_COOKIE") == "1":
-            return None  # 本地 http 开发不强制
+            return None
+        host = request.host.split(":")[0]
+        if host in ("localhost", "127.0.0.1", "0.0.0.0"):
+            return None
         if request.path.startswith("/static/"):
             return None  # 静态资源不重定向（避免多余跳转）
         proto = request.headers.get("X-Forwarded-Proto", "http")

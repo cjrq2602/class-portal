@@ -127,3 +127,23 @@ def hub_items() -> list[dict[str, Any]]:
 def quick_items() -> list[dict[str, Any]]:
     """首页快捷宫格：全部已上线板块（首页自身除外）。"""
     return [b for b in online_blocks() if b["key"] != "home"]
+
+
+# 首页「常用」入口：只放真正高频的 6 个，其余收进「全部功能」抽屉
+HOME_PRIMARY_KEYS: tuple[str, ...] = (
+    "homework", "checkin", "activities", "news", "game", "resources",
+)
+
+
+def home_primary() -> list[dict[str, Any]]:
+    """首页常用入口（6 个，按固定顺序，缺失则跳过）。"""
+    by_key: dict[str, dict[str, Any]] = {
+        b["key"]: b for b in online_blocks() if b["key"] != "home"}
+    return [by_key[k] for k in HOME_PRIMARY_KEYS if k in by_key]
+
+
+def home_more() -> list[dict[str, Any]]:
+    """首页「全部功能」抽屉：常用之外的其余板块。"""
+    primary: set[str] = set(HOME_PRIMARY_KEYS)
+    return [b for b in online_blocks()
+            if b["key"] != "home" and b["key"] not in primary]

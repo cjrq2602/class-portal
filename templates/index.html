@@ -3,21 +3,44 @@
 {% block title %}首页 · 守夜广场{% endblock %}
 
 {% block content %}
-<!-- ============ part3 顶部：今天值日提示条（无数据不显示） ============ -->
-{% if duty_item %}
-<div class="duty-bar mb-16" id="duty-bar">
-    <span class="duty-bar__icon" data-home-icon2="grid"></span>
-    <div style="min-width:0">
-        <b>今天值日：{{ duty_item.group_name or "未命名小组" }}</b>
-        <div class="text-muted" style="font-size:var(--fs-12)">
-            成员：{{ duty_item.members or "—" }}{% if duty_item.task %} · 任务：{{ duty_item.task }}{% endif %}
+{# ============================================================
+   首页信息架构（第 6 期整理版）
+   原则：一屏只放「今天需要知道的」+「最常用的 6 个入口」，
+        其余功能收进「全部功能」抽屉，不再平铺 15 个宫格。
+   手机：单列、触控友好；电脑：双列、信息密度更高。
+   ============================================================ #}
+
+<!-- ============ ① 顶部紧凑问候条 ============ -->
+<section class="home-bar">
+    <div class="home-bar__main">
+        <h1 class="home-bar__hello">{{ greeting }}{% if me %}，{{ me.nickname }}{% endif %}</h1>
+        <div class="home-bar__meta">
+            <span data-home-icon="calendar"></span>
+            {{ bj.date }} · {{ bj.weekday }}
+            {% if duty_item %}
+            <span class="home-bar__sep">·</span>
+            <a href="/duty" class="home-bar__duty">今日值日 {{ duty_item.group_name or "—" }}</a>
+            {% endif %}
         </div>
     </div>
-    <a class="btn btn--ghost btn--sm" href="/duty" style="margin-left:auto">查看值日表</a>
-</div>
-{% endif %}
+    {% if me %}
+    <div class="home-bar__user">
+        <span id="hero-avatar"></span>
+        <div class="home-bar__stat">
+            <b class="num">{{ game_wins }}</b><span>胜</span>
+            <b class="num">{{ game_losses }}</b><span>负</span>
+        </div>
+        <a class="btn btn--ghost btn--sm" href="/me">个人中心</a>
+    </div>
+    {% else %}
+    <div class="home-bar__user">
+        <a class="btn btn--primary btn--sm" href="/login">登录</a>
+        <a class="btn btn--outline btn--sm" href="/register">注册</a>
+    </div>
+    {% endif %}
+</section>
 
-<!-- ============ part6 未读更新横幅（点开即记已读，红点消失） ============ -->
+<!-- ============ ② 未读更新横幅（有才显示） ============ -->
 {% if update_banner %}
 <a class="upd-banner mb-16" href="/updates">
     <span class="upd-banner__icon" data-upd-banner-icon="megaphone"></span>
@@ -29,309 +52,197 @@
 </a>
 {% endif %}
 
-<!-- ============ Hero：时段问候 + 北京日期 + 最近活动倒计时 ============ -->
-<!-- 问候语与日期由服务端按北京时间渲染（UTC+8 换算见 common.beijing_now） -->
-<section class="card hero mt-8">
-    <div class="flex-between flex-wrap gap-16">
-        <div style="min-width:0">
-            <h1 class="hero__greeting">{{ greeting }}{% if me %}，{{ me.nickname }}{% endif %} 👋</h1>
-            <p class="text-muted mt-8">
-                <span data-home-icon="calendar"></span>
-                {{ bj.date }} · {{ bj.weekday }}
-            </p>
+<!-- ============ ③ 今日概览：三个可点的状态块 ============ -->
+<div class="today-strip">
+    <a class="today-chip" href="/homework">
+        <span class="today-chip__icon" data-chip-icon="file-text"></span>
+        <div class="today-chip__body">
+            <b>{{ hw_pending if me else (homework|length) }}</b>
+            <span>{{ "待完成作业" if me else "条作业" }}</span>
         </div>
+    </a>
 
-        <!-- part3：最近一个进行中/即将开始活动的倒计时大数字（渐变文字） -->
-        {% if act_item %}
-        <div class="hero__countdown" id="hero-countdown"
-             data-target="{{ act_item.target_ts|int }}"
-             data-label="{{ act_item.status_label }}">
-            <div class="countdown-label">
-                {{ act_item.atype_label }} · {{ act_item.status_label }} · {{ act_item.title }}
-            </div>
-            <div class="countdown-num" id="countdown-num">--:--:--</div>
-            <div class="countdown-label" id="countdown-hint">
-                距{{ "结束" if act_item.status == "ongoing" else "开始" }}
-            </div>
-            <a class="btn btn--outline btn--sm mt-8" href="/activities">去活动页报名</a>
+    {% if checkin_item %}
+    <a class="today-chip{{ ' today-chip--done' if me and checkin_item.checked_today }}"
+       href="/checkin">
+        <span class="today-chip__icon" data-chip-icon="target"></span>
+        <div class="today-chip__body">
+            <b>{{ "已打卡" if me and checkin_item.checked_today else ("未打卡" if me else checkin_item.count) }}</b>
+            <span>{% if me %}连续 {{ checkin_item.my_streak }} 天{% else %}个挑战{% endif %}</span>
         </div>
-        {% elif me %}
-        <div class="hero__user flex gap-12">
-            <span id="hero-avatar"></span>
-            <div>
-                <div class="flex gap-8">
-                    <b>{{ me.nickname }}</b>
-                    <span class="tag tag--primary">{{ me.role_display if me.role_display else '成员' }}</span>
-                </div>
-                <div class="text-muted" style="font-size:var(--fs-12)">
-                    游戏战绩 <b class="num">{{ game_wins }}</b> 胜 / <b class="num">{{ game_losses }}</b> 负
-                </div>
-            </div>
-            <a class="btn btn--outline btn--sm" href="/me">个人中心</a>
+    </a>
+    {% endif %}
+
+    {% if act_item %}
+    <a class="today-chip today-chip--act" href="/activities"
+       id="today-countdown"
+       data-target="{{ act_item.target_ts|int }}"
+       data-status="{{ act_item.status }}">
+        <span class="today-chip__icon" data-chip-icon="calendar"></span>
+        <div class="today-chip__body">
+            <b id="today-countdown-num">--:--</b>
+            <span class="truncate">{{ act_item.status_label }} · {{ act_item.title }}</span>
         </div>
-        {% else %}
-        <div class="hero__login flex gap-12">
-            <div class="text-muted" style="font-size:var(--fs-12);max-width:180px">
-                登录后解锁互动板块、作业追踪与更多功能
-            </div>
-            <a class="btn btn--primary" href="/login">登录</a>
-            <a class="btn btn--outline" href="/register">注册</a>
-        </div>
-        {% endif %}
+    </a>
+    {% endif %}
+</div>
+
+<!-- ============ ④ 常用入口（6 个）+ 全部功能抽屉 ============ -->
+<section class="home-entry">
+    <div class="home-entry__head">
+        <h2>常用</h2>
+        <button class="home-entry__more" id="more-toggle" type="button"
+                aria-expanded="false" aria-controls="more-panel">
+            全部功能 <span class="home-entry__caret">▾</span>
+        </button>
     </div>
-</section>
 
-<!-- ============ part4：每日一句横幅（引用样式，点击进列表页） ============ -->
-{% if today_quote %}
-<a class="quote-banner mt-16" href="/quote" style="display:block;color:inherit;text-decoration:none">
-    <div class="quote-banner__mark">❝</div>
-    <div class="quote-banner__text">{{ today_quote.content }}</div>
-    <div class="quote-banner__meta">— {{ today_quote.author }}
-        <span class="quote-like">❤️ <b class="num">{{ today_quote.like_count }}</b></span>
-        <span class="text-faint" style="font-size:var(--fs-12)"> · 点击查看全部每日一句</span>
-    </div>
-</a>
-{% endif %}
-
-<!-- ============ 快捷宫格：全部已上线板块（3/4/6 列响应式，来自 blocks.py） ============ -->
-<section class="mt-24">
-    <h2 class="mb-16">快捷入口</h2>
-    <div class="quick-grid stagger">
-        {% for b in quick_grid %}
-        <a class="card card--hover quick-item" href="{{ b.href }}">
-            <span class="quick-icon" data-quick-icon="{{ b.icon }}"
+    <div class="home-quick">
+        {% for b in home_primary %}
+        <a class="home-quick__item" href="{{ b.href }}">
+            <span class="home-quick__icon" data-quick-icon="{{ b.icon }}"
                   data-quick-color="{{ b.color }}"></span>
-            <div style="min-width:0">
-                <b>{{ b.name }}</b>
-                <div class="text-muted" style="font-size:var(--fs-12)">{{ b.desc }}</div>
-            </div>
+            <b>{{ b.name }}</b>
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="home-more" id="more-panel" hidden>
+        {% for b in home_more %}
+        <a class="home-more__item" href="{{ b.href }}">
+            <span class="home-more__icon" data-quick-icon="{{ b.icon }}"
+                  data-quick-color="{{ b.color }}"></span>
+            <span>{{ b.name }}</span>
         </a>
         {% endfor %}
     </div>
 </section>
 
-<!-- ============ 双列布局 ============ -->
-<div class="grid mt-32">
-    <!-- ---------------- 左列 ---------------- -->
-    <div class="col-6">
-        <!-- part3：最新作业卡（≤3 条，含我的完成勾选） -->
-        <div class="card">
-            <div class="digest-card__head">
-                <h2>📚 最新作业</h2>
-                <a class="btn btn--ghost btn--sm" href="/homework">全部作业</a>
+<!-- ============ ⑤ 主内容双列 ============ -->
+<div class="home-grid">
+    <!-- 今日总结 -->
+    <section class="card home-card home-card--digest">
+        <div class="digest-card__head">
+            <h2>🗓️ {{ digest_title }}</h2>
+            <a class="btn btn--ghost btn--sm" href="/digest">查看全部</a>
+        </div>
+        {% if digest_card.exists %}
+            <div class="text-faint" style="font-size:var(--fs-12);margin-bottom:8px">
+                {{ digest_card.date }} · 纳入 <b class="num">{{ digest_card.news_count }}</b> 条
+                {% if digest_card.edited %} · 已编辑{% endif %}
             </div>
-            {% if homework %}
-            <div>
-                {% for h in homework %}
-                <div class="hw-item{{ ' hw-item--done' if h.done else '' }}"
-                     data-home-hw="{{ h.id }}">
-                    <input type="checkbox" class="hw-item__check" data-home-hw-check="{{ h.id }}"
-                           {{ "checked" if h.done else "" }} {{ "" if me else "disabled" }}
-                           title="我已完成（仅自己可见）">
-                    <div class="hw-item__body">
-                        <div class="hw-item__content">{{ h.content }}</div>
-                        <div class="hw-item__meta">
-                            <span class="tag tag--primary">{{ h.subject }}</span>
-                            <span data-hw-due="{{ h.due_at|int }}"></span>
-                        </div>
-                    </div>
+            {% if digest_card.article and digest_card.article.paragraphs %}
+                {# 优先展示连贯短评的导语与首段，比罗列要点更易读 #}
+                {% for p in digest_card.article.paragraphs[:2] %}
+                    {% if p.kind in ('lead', 'section') %}
+                    <p class="home-digest__text">{{ p.text }}</p>
+                    {% endif %}
+                {% endfor %}
+            {% elif digest_card.points %}
+                {% for p in digest_card.points[:2] %}
+                <div class="digest-point">
+                    <span class="digest-point__idx num">{{ loop.index }}</span>
+                    <div>{{ p.text }}</div>
                 </div>
                 {% endfor %}
-            </div>
-            <div class="hw-privacy-note mt-8">🔒 完成勾选仅自己可见</div>
             {% else %}
-            <div class="empty"><span class="empty__art"></span>
-                <div class="empty__text">暂无作业，好好休息</div></div>
-            {% endif %}
-        </div>
-
-        <!-- part2：今日总结摘要卡 -->
-        <div class="card mt-16">
-            <div class="digest-card__head">
-                <h2>🗓️ 今日总结</h2>
-                <a class="btn btn--ghost btn--sm" href="/digest">查看全部</a>
-            </div>
-            {% if digest_card.exists %}
-                <div class="text-faint" style="font-size:var(--fs-12);margin-bottom:8px">
-                    {{ digest_card.date }} · 纳入 <b class="num">{{ digest_card.news_count }}</b> 条
-                    {% if digest_card.edited %} · 已编辑{% endif %}
-                </div>
-                {% if digest_card.points %}
-                <div>
-                    {% for p in digest_card.points[:3] %}
-                    <div class="digest-point">
-                        <span class="digest-point__idx num">{{ loop.index }}</span>
-                        <div>{{ p.text }}</div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% if digest_card.keywords %}
-                <div class="kw-list mt-8">
-                    {% for k in digest_card.keywords[:5] %}<span class="tag">{{ k }}</span>{% endfor %}
-                </div>
-                {% endif %}
-                {% else %}
                 <div class="empty"><span class="empty__art"></span>
                     <div class="empty__text">该时段暂无新闻</div></div>
-                {% endif %}
-            {% else %}
-                <div class="empty">
-                    <span class="empty__art"></span>
-                    <div class="empty__text">将于 {{ ready_at }} 更新（北京时间）</div>
-                </div>
             {% endif %}
-        </div>
-
-        <!-- part2：最新新闻 -->
-        <div class="card mt-16">
-            <div class="digest-card__head">
-                <h2>📰 最新新闻</h2>
-                <a class="btn btn--ghost btn--sm" href="/news">进入新闻中心</a>
+            {% if digest_card.keywords %}
+            <div class="kw-list mt-8">
+                {% for k in digest_card.keywords[:4] %}<span class="tag">{{ k }}</span>{% endfor %}
             </div>
-            {% if latest_news %}
-            <div class="stagger">
-                {% for n in latest_news %}
-                <a class="news-item" href="{{ n.url }}" target="_blank" rel="noopener noreferrer">
-                    <div class="news-item__title">{{ n.title }}</div>
-                    <div class="news-item__meta">
-                        <span class="tag tag--primary">{{ n.source }}</span>
-                        <span data-news-time="{{ n.published_at }}"></span>
-                    </div>
-                </a>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty"><span class="empty__art"></span>
-                <div class="empty__text">暂无新闻，抓取任务可能尚未产出数据</div></div>
             {% endif %}
-        </div>
-    </div>
-
-    <!-- ---------------- 右列 ---------------- -->
-    <div class="col-6">
-        <!-- part4：打卡挑战入口卡 -->
-        {% if checkin_item %}
-        <div class="card">
-            <div class="digest-card__head">
-                <h2>🎯 打卡挑战</h2>
-                <a class="btn btn--ghost btn--sm" href="/checkin">全部挑战</a>
+        {% else %}
+            <div class="empty">
+                <span class="empty__art"></span>
+                <div class="empty__text">将于 {{ ready_at }} 更新（北京时间）</div>
             </div>
-            <div class="checkin-entry">
-                <span class="hub-card__icon" style="background:var(--grad-brand);width:48px;height:48px"
-                      id="home-ck-icon"></span>
-                <div style="flex:1;min-width:0">
-                    <b>{{ checkin_item.name }}</b>
-                    <div class="text-muted" style="font-size:var(--fs-12)">
-                        {% if me %}
-                            {% if checkin_item.checked_today %}
-                            今日已打卡 ✓ · 连续 <b class="num">{{ checkin_item.my_streak }}</b> 天 🔥
-                            {% else %}
-                            今天还没打卡 · 连续 <b class="num">{{ checkin_item.my_streak }}</b> 天 🔥
-                            {% endif %}
-                        {% else %}
-                            共 {{ checkin_item.count }} 个挑战进行中
-                        {% endif %}
-                    </div>
-                </div>
-                <a class="btn btn--primary btn--sm" href="/checkin">
-                    {{ "去打卡" if me and not checkin_item.checked_today else "查看" }}</a>
-            </div>
-        </div>
         {% endif %}
+    </section>
 
-        <!-- part3：进行中活动 -->
-        <div class="card">
-            <div class="digest-card__head">
-                <h2>🎪 进行中活动</h2>
-                <a class="btn btn--ghost btn--sm" href="/activities">全部活动</a>
-            </div>
-            {% if act_item %}
-            <div class="ann-item">
-                <div style="flex:1;min-width:0">
-                    <div class="flex gap-8" style="align-items:center">
-                        <span class="tag st-{{ act_item.status }}">{{ act_item.status_label }}</span>
-                        <span class="tag tag--primary">{{ act_item.atype_label }}</span>
+    <!-- 最新作业 -->
+    <section class="card home-card">
+        <div class="digest-card__head">
+            <h2>📚 最新作业</h2>
+            <a class="btn btn--ghost btn--sm" href="/homework">全部</a>
+        </div>
+        {% if homework %}
+        <div>
+            {% for h in homework %}
+            <div class="hw-item{{ ' hw-item--done' if h.done else '' }}"
+                 data-home-hw="{{ h.id }}">
+                <input type="checkbox" class="hw-item__check" data-home-hw-check="{{ h.id }}"
+                       {{ "checked" if h.done else "" }} {{ "" if me else "disabled" }}
+                       title="我已完成（仅自己可见）">
+                <div class="hw-item__body">
+                    <div class="hw-item__content">{{ h.content }}</div>
+                    <div class="hw-item__meta">
+                        <span class="tag tag--primary">{{ h.subject }}</span>
+                        <span data-hw-due="{{ h.due_at|int }}"></span>
                     </div>
-                    <div class="ann-item__title mt-8">{{ act_item.title }}</div>
-                    <div class="ann-item__meta" data-act-time="{{ act_item.target_ts|int }}"
-                         data-act-status="{{ act_item.status }}"></div>
                 </div>
             </div>
-            {% else %}
-            <div class="empty"><span class="empty__art"></span>
-                <div class="empty__text">暂无进行中的活动</div></div>
-            {% endif %}
+            {% endfor %}
         </div>
-
-        <!-- part3：荣誉精选（置顶 1 条） -->
-        <div class="card mt-16">
-            <div class="digest-card__head">
-                <h2>🏆 荣誉精选</h2>
-                <a class="btn btn--ghost btn--sm" href="/honors">荣誉墙</a>
-            </div>
-            {% if honor %}
-            <div class="flex gap-12" style="align-items:flex-start">
-                {% if honor.has_image %}
-                <img src="/api/honors/image/{{ honor.id }}" alt="{{ honor.title }}"
-                     loading="lazy" style="width:76px;height:76px;object-fit:cover;border-radius:var(--r-8);flex-shrink:0">
-                {% else %}
-                <span style="width:76px;height:76px;border-radius:var(--r-8);flex-shrink:0;
-                             display:inline-flex;align-items:center;justify-content:center;
-                             background:var(--bg-hover);color:var(--c-warning)"
-                      data-home-icon3="trophy"></span>
-                {% endif %}
-                <div style="min-width:0">
-                    <div class="flex gap-8" style="align-items:center">
-                        <b>{{ honor.title }}</b>
-                        {% if honor.is_pinned %}<span class="tag tag--warning">📌 置顶</span>{% endif %}
-                    </div>
-                    {% if honor.owner %}
-                    <div class="text-muted" style="font-size:var(--fs-13)">🏅 {{ honor.owner }}</div>
-                    {% endif %}
-                    {% if honor.date %}
-                    <div class="text-faint" style="font-size:var(--fs-12)">{{ honor.date }}</div>
-                    {% endif %}
-                    {% if honor.description %}
-                    <div class="news-item__summary">{{ honor.description }}</div>
-                    {% endif %}
-                </div>
-            </div>
-            {% else %}
-            <div class="empty"><span class="empty__art"></span>
-                <div class="empty__text">还没有荣誉，第一块奖牌等着你们来拿</div></div>
-            {% endif %}
-        </div>
-
-        <!-- part2：热门吐槽 -->
-        <div class="card mt-16">
-            <div class="digest-card__head">
-                <h2>🔥 热门吐槽</h2>
-                <a class="btn btn--ghost btn--sm" href="/tucao">去吐槽墙</a>
-            </div>
-            {% if hot_tucao %}
-            <div class="stagger">
-                {% for t in hot_tucao %}
-                <div class="news-item">
-                    <div class="flex gap-8" style="align-items:center">
-                        {% if t.persona == 'real' %}<b>{{ t.display_name }}</b>
-                        {% else %}<span class="tag">🎭 {{ t.display_name }}</span>{% endif %}
-                        <span class="text-faint" style="font-size:var(--fs-12);margin-left:auto">
-                            ❤️ <b class="num">{{ t.like_count }}</b></span>
-                    </div>
-                    <div class="news-item__summary">{{ t.content }}</div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty"><span class="empty__art"></span>
-                <div class="empty__text">还没有吐槽，来抢第一条</div></div>
-            {% endif %}
-        </div>
-    </div>
+        <div class="hw-privacy-note mt-8">🔒 完成勾选仅自己可见</div>
+        {% else %}
+        <div class="empty"><span class="empty__art"></span>
+            <div class="empty__text">暂无作业，好好休息</div></div>
+        {% endif %}
+    </section>
 </div>
 
-<!-- ============ 公告栏（最新 3 条）+ 网站更新摘要卡（最新 release） ============ -->
-<section class="mt-32">
+<!-- ============ ⑥ 最新新闻（横向三条） ============ -->
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>📰 最新新闻</h2>
+        <a class="btn btn--ghost btn--sm" href="/news">新闻中心</a>
+    </div>
+    {% if latest_news %}
+    <div class="news-strip">
+        {% for n in latest_news[:3] %}
+        <a class="news-strip__item" href="{{ n.url }}" target="_blank" rel="noopener noreferrer">
+            <div class="news-strip__title">{{ n.title }}</div>
+            <div class="news-strip__meta">
+                <span class="tag tag--primary">{{ n.source }}</span>
+                <span data-news-time="{{ n.published_at }}"></span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty"><span class="empty__art"></span>
+        <div class="empty__text">暂无新闻，抓取任务可能尚未产出数据</div></div>
+    {% endif %}
+</section>
+
+<!-- ============ ⑦ 班级动态（活动/荣誉/吐槽/打卡合并） ============ -->
+{% if feed %}
+<section class="card mt-16">
+    <div class="digest-card__head">
+        <h2>� 班级动态</h2>
+        <a class="btn btn--ghost btn--sm" href="/hub">互动总览</a>
+    </div>
+    <div class="feed">
+        {% for f in feed %}
+        <a class="feed__item" href="{{ f.href }}">
+            <span class="feed__icon" data-quick-icon="{{ f.icon }}"
+                  data-quick-color="{{ f.color }}"></span>
+            <div class="feed__body">
+                <div class="feed__title truncate">{{ f.title }}</div>
+                <div class="feed__meta">{{ f.meta }}</div>
+            </div>
+            <span class="feed__arrow">›</span>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<!-- ============ ⑧ 公告栏 + 网站更新摘要 ============ -->
+<section class="mt-24">
     <div class="flex-between mb-16">
         <h2><span data-home-icon4="megaphone"></span> 公告栏</h2>
     </div>
@@ -360,40 +271,51 @@
     </div>
 </section>
 
-<!-- ============ 游戏入口渐变大横幅 ============ -->
-<section class="game-banner mt-32">
+<!-- ============ ⑨ 每日一句 ============ -->
+{% if today_quote %}
+<a class="quote-banner mt-24" href="/quote" style="display:block;color:inherit;text-decoration:none">
+    <div class="quote-banner__mark">❝</div>
+    <div class="quote-banner__text">{{ today_quote.content }}</div>
+    <div class="quote-banner__meta">— {{ today_quote.author }}
+        <span class="quote-like">❤️ <b class="num">{{ today_quote.like_count }}</b></span>
+    </div>
+</a>
+{% endif %}
+
+<!-- ============ ⑩ 游戏入口（缩小版） ============ -->
+<section class="game-banner mt-24">
     <div>
         <h2 class="game-banner__title">🏰 守夜小队 · 合作塔防</h2>
-        <p class="game-banner__sub">叫上同学一起守营地——4 人组队、快速匹配、随开随玩</p>
-        <a class="btn btn--lg game-banner__cta" href="/game">
+        <p class="game-banner__sub">叫上同学一起守营地，随开随玩</p>
+        <a class="btn game-banner__cta" href="/game">
             <span data-banner-icon="zap"></span> 立即开战
         </a>
     </div>
 </section>
 
-<!-- ============ 页脚说明 ============ -->
 <p class="text-center text-faint mt-32" style="font-size:var(--fs-12)">
-    守夜广场 · 班级门户 ｜ 四期改造已完成
+    守夜广场 · 班级门户
 </p>
-{# 首页专用样式已外链化至 components.css（.hero/.quick-grid/.ann-item/.game-banner） #}
 {% endblock %}
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-/* 首页脚本：图标注入 + 北京时间标注 + 活动倒计时 + 作业勾选 + 公告加载 */
 (function () {
+    /* ---- 图标注入 ---- */
     ["data-home-icon", "data-home-icon2", "data-home-icon3", "data-home-icon4"].forEach(function (attr) {
         document.querySelectorAll("[" + attr + "]").forEach(function (s) {
             s.outerHTML = icon(s.getAttribute(attr), attr === "data-home-icon" ? 15 : 20);
         });
     });
+    document.querySelectorAll("[data-chip-icon]").forEach(function (s) {
+        s.innerHTML = icon(s.getAttribute("data-chip-icon"), 18);
+    });
     document.querySelectorAll("[data-quick-icon]").forEach(function (s) {
         s.style.background = s.dataset.quickColor;
-        s.innerHTML = icon(s.dataset.quickIcon, 22);
+        s.innerHTML = icon(s.dataset.quickIcon, 20);
     });
     var bi = document.querySelector("[data-banner-icon]");
     if (bi) bi.outerHTML = icon("zap", 18);
-    /* part6：更新横幅/摘要卡图标与时间 */
     document.querySelectorAll("[data-upd-banner-icon]").forEach(function (s) {
         s.innerHTML = icon(s.dataset.updBannerIcon, 20);
     });
@@ -403,9 +325,6 @@
     document.querySelectorAll("[data-rel-time]").forEach(function (el) {
         el.textContent = "发布于 " + fmtBeijing(parseInt(el.dataset.relTime, 10));
     });
-    /* part4：打卡入口卡图标 */
-    var ckIcon = document.getElementById("home-ck-icon");
-    if (ckIcon) ckIcon.innerHTML = icon({{ (checkin_item.icon if checkin_item else 'target')|tojson }}, 26);
     document.querySelectorAll("[data-news-time]").forEach(function (el) {
         el.textContent = fmtBeijing(parseFloat(el.dataset.newsTime));
     });
@@ -414,22 +333,34 @@
     });
     {% if me %}
     var av = document.getElementById("hero-avatar");
-    if (av) av.innerHTML = avatarHtml({{ me.nickname|tojson }}, "avatar--lg");
+    if (av) av.innerHTML = avatarHtml({{ me.nickname|tojson }}, "avatar--sm");
     {% endif %}
 
-    /* ---- part3：活动倒计时（每秒刷新，>24h 显示"天"） ---- */
-    var cdBox = document.getElementById("hero-countdown");
-    if (cdBox) {
-        var target = parseInt(cdBox.dataset.target, 10) * 1000;
-        var numEl = document.getElementById("countdown-num");
+    /* ---- 全部功能抽屉：原生折叠，无额外请求 ---- */
+    var moreBtn = document.getElementById("more-toggle");
+    var morePanel = document.getElementById("more-panel");
+    if (moreBtn && morePanel) {
+        moreBtn.onclick = function () {
+            var open = morePanel.hidden;
+            morePanel.hidden = !open;
+            moreBtn.setAttribute("aria-expanded", String(open));
+            moreBtn.querySelector(".home-entry__caret").textContent = open ? "▴" : "▾";
+        };
+    }
+
+    /* ---- 今日概览里的活动倒计时（只更新一个数字，开销极小） ---- */
+    var cd = document.getElementById("today-countdown");
+    var cdNum = document.getElementById("today-countdown-num");
+    if (cd && cdNum) {
+        var target = parseInt(cd.dataset.target, 10) * 1000;
         var tick = function () {
             var ms = target - Date.now();
-            if (ms <= 0) { numEl.textContent = "已开始"; return; }
+            if (ms <= 0) { cdNum.textContent = "已开始"; return; }
             var s = Math.floor(ms / 1000);
             var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600),
                 m = Math.floor(s % 3600 / 60), sec = s % 60;
-            numEl.textContent = d > 0
-                ? d + "天 " + h + "小时"
+            cdNum.textContent = d > 0
+                ? d + "天" + h + "时"
                 : String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0") +
                   ":" + String(sec).padStart(2, "0");
         };
@@ -437,18 +368,18 @@
         setInterval(tick, 1000);
     }
 
-    /* ---- part3：作业截止时间标注（剩余不足 24h 标红） ---- */
+    /* ---- 作业截止时间标注 ---- */
     document.querySelectorAll("[data-hw-due]").forEach(function (el) {
         var ts = parseInt(el.dataset.hwDue, 10) * 1000;
         var ms = ts - Date.now();
         if (ms <= 0) { el.innerHTML = "已过期"; el.className = "text-danger"; return; }
         var hours = ms / 3600000;
         el.textContent = "截止 " + fmtBeijing(ts / 1000) +
-            (hours < 24 ? "（剩余 " + Math.floor(hours) + " 小时）" : "");
+            (hours < 24 ? "（剩 " + Math.floor(hours) + " 小时）" : "");
         if (hours < 24) el.className = "text-danger";
     });
 
-    /* ---- part3：首页作业勾选（仅自己可见，未登录禁用） ---- */
+    /* ---- 作业勾选（仅自己可见） ---- */
     document.querySelectorAll("[data-home-hw-check]").forEach(function (cb) {
         cb.onchange = async function () {
             var id = parseInt(cb.dataset.homeHwCheck, 10);
@@ -463,16 +394,9 @@
         };
     });
 
-    /* ---- part3：右列活动时间标注 ---- */
-    document.querySelectorAll("[data-act-time]").forEach(function (el) {
-        var ts = parseInt(el.dataset.actTime, 10);
-        el.textContent = (el.dataset.actStatus === "ongoing" ? "结束于 " : "开始于 ") +
-            fmtBeijing(ts);
-    });
-
-    /* ---- part2：公告（骨架屏 → 列表 / 空态） ---- */
+    /* ---- 公告（骨架屏 → 列表 / 空态） ---- */
     var annEl = document.getElementById("ann-list");
-    Skeleton.inject(annEl, 3);
+    Skeleton.inject(annEl, 2);
     fetchJSON("/api/home/announcements").then(function (r) {
         var list = r.list || [];
         if (!list.length) {
@@ -487,7 +411,7 @@
                 '<div style="flex:1;min-width:0">' +
                 '<div class="ann-item__title truncate">' + escapeLocal(a.title) + '</div>' +
                 '<div class="ann-item__meta">' + escapeLocal(a.author) + ' · ' +
-                fmtBeijing(a.created_at) + '（北京时间）</div>' +
+                fmtBeijing(a.created_at) + '</div>' +
                 (a.content ? '<div class="ann-item__content">' + escapeLocal(a.content) + '</div>' : '') +
                 '</div></div>';
         }).join("") + '</div>';

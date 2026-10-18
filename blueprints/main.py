@@ -49,6 +49,8 @@ def _home_public_data() -> dict[str, Any]:
     """
     news_rows, _news_total = portal_db.list_news(page=1, per_page=5)
     today_view: dict[str, Any] = digest_service.digest_view("today")
+    # 0~9 点今日总结尚未生成时，首页回退展示昨日总结，避免整卡空白
+    yesterday_view: dict[str, Any] = digest_service.digest_view("yesterday")
 
     duty_row = portal_db.duty_today()
     duty_item: Optional[dict[str, Any]] = None
@@ -100,6 +102,7 @@ def _home_public_data() -> dict[str, Any]:
             "url": str(r["url"]), "published_at": float(r["published_at"]),
         } for r in news_rows],
         "digest_card": today_view,
+        "digest_card_yesterday": yesterday_view,
         "hot_tucao": portal_db.tucao_hot(limit=3),
         "duty_item": duty_item,
         "act_item": act_item,
@@ -177,6 +180,58 @@ def index():
             "count": int(challenge_pub["count"]),
         }
 
+    homework_list: list[dict[str, Any]] = [
+        {"id": int(r["id"]), "subject": str(r["subject"]), "content": str(r["content"]),
+         "due_at": float(r["due_at"]),
+         "done": bool(hw_done is not None and int(r["id"]) in hw_done)}
+        for r in pub["hw_latest"]]
+    hw_pending: int = sum(1 for h in homework_list if not h["done"])
+
+    # ---- 班级动态：把「活动 / 荣誉 / 吐槽 / 打卡」合并成一条时间流 ----
+    # 首页不再摆四张并列卡片，减少视觉噪音；每项仍可点进对应板块。
+    feed: list[dict[str, Any]] = []
+    if pub["act_item"]:
+        a = pub["act_item"]
+        feed.append({
+            "kind": "activity", "icon": "calendar", "color": "#F59E0B",
+            "title": a["title"],
+            "meta": f"{a['atype_label']} · {a['status_label']}",
+            "href": "/activities",
+        })
+    if pub["honor"]:
+        h = pub["honor"]
+        feed.append({
+            "kind": "honor", "icon": "trophy", "color": "#EAB308",
+            "title": h["title"],
+            "meta": (h["owner"] or "班级荣誉"),
+            "href": "/honors",
+        })
+    for t in (pub["hot_tucao"] or [])[:2]:
+        feed.append({
+            "kind": "tucao", "icon": "message", "color": "#EC4899",
+            "title": str(t["content"])[:42],
+            "meta": f"{t['display_name']} · ❤️ {t['like_count']}",
+            "href": "/tucao",
+        })
+    if checkin_item is not None:
+        feed.append({
+            "kind": "checkin", "icon": "target", "color": "#10B981",
+            "title": checkin_item["name"],
+            "meta": ("今天已打卡 ✓" if checkin_item["checked_today"]
+                     else "今天还没打卡") if uid else
+                    f"{checkin_item['count']} 个挑战进行中",
+            "href": "/checkin",
+        })
+
+    # 首页总结卡：优先今日；0~9 点今日未生成时回退昨日，标题同步切换
+    digest_card: dict[str, Any] = pub["digest_card"]
+    digest_title: str = "今日总结"
+    if not digest_card.get("exists"):
+        y = pub.get("digest_card_yesterday") or {}
+        if y.get("exists"):
+            digest_card = y
+            digest_title = "昨日总结"
+
     return render_template(
         "index.html",
         greeting=common.greeting_by_hour(),
@@ -184,18 +239,18 @@ def index():
         me=user if logged_in else None,
         game_wins=int(stats["wins"]) if stats else 0,
         game_losses=int(stats["losses"]) if stats else 0,
-        quick_grid=blocks.quick_items(),
+        home_primary=blocks.home_primary(),
+        home_more=blocks.home_more(),
         latest_news=pub["latest_news"],
-        digest_card=pub["digest_card"],
+        digest_card=digest_card,
+        digest_title=digest_title,
         ready_at=common.today_digest_ready_at(),
         hot_tucao=pub["hot_tucao"],
         duty_item=pub["duty_item"],
         act_item=pub["act_item"],
-        homework=[
-            {"id": int(r["id"]), "subject": str(r["subject"]), "content": str(r["content"]),
-             "due_at": float(r["due_at"]),
-             "done": bool(hw_done is not None and int(r["id"]) in hw_done)}
-            for r in pub["hw_latest"]],
+        homework=homework_list,
+        hw_pending=hw_pending,
+        feed=feed,
         honor=pub["honor"],
         today_quote=pub["today_quote"],
         checkin_item=checkin_item,

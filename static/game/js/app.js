@@ -648,6 +648,59 @@ function leaveToMenu() {
 // ============================================================
 let canvas, ctx, cellSize = 60, animId = null;
 
+// 渐变缓存：背景/星云/炮塔渐变都是静态对象，只随画布尺寸变化
+const gradCache = {
+    bg: null, bgW: 0, bgH: 0,
+    neb1: null, neb1W: 0, neb1H: 0,
+    neb2: null, neb2W: 0, neb2H: 0,
+    tower: {}, towerSize: 0,  // 炮塔渐变按 cellSize 缓存
+};
+function getBgGrad(w, h) {
+    if (!gradCache.bg || gradCache.bgW !== w || gradCache.bgH !== h) {
+        gradCache.bg = ctx.createLinearGradient(0, 0, 0, h);
+        gradCache.bg.addColorStop(0, "#0b1426");
+        gradCache.bg.addColorStop(0.5, "#0d1a30");
+        gradCache.bg.addColorStop(1, "#0a1020");
+        gradCache.bgW = w; gradCache.bgH = h;
+    }
+    return gradCache.bg;
+}
+function getNeb1(x, y, w, h) {
+    if (!gradCache.neb1 || gradCache.neb1W !== w || gradCache.neb1H !== h) {
+        gradCache.neb1 = ctx.createRadialGradient(x, y, 0, x, y, h * 0.55);
+        gradCache.neb1.addColorStop(0, "rgba(0,212,255,0.05)");
+        gradCache.neb1.addColorStop(1, "rgba(0,212,255,0)");
+        gradCache.neb1W = w; gradCache.neb1H = h;
+    }
+    return gradCache.neb1;
+}
+function getNeb2(x, y, w, h) {
+    if (!gradCache.neb2 || gradCache.neb2W !== w || gradCache.neb2H !== h) {
+        gradCache.neb2 = ctx.createRadialGradient(x, y, 0, x, y, h * 0.5);
+        gradCache.neb2.addColorStop(0, "rgba(124,58,237,0.06)");
+        gradCache.neb2.addColorStop(1, "rgba(124,58,237,0)");
+        gradCache.neb2W = w; gradCache.neb2H = h;
+    }
+    return gradCache.neb2;
+}
+// 炮塔渐变缓存：cellSize 变化时重建
+function getTowerGrad(dual, size) {
+    const key = dual ? "dual" : "normal";
+    if (!gradCache.tower[key] || gradCache.towerSize !== size) {
+        const g = ctx.createLinearGradient(0, 0, size, size);
+        if (dual) {
+            g.addColorStop(0, "rgba(124,58,237,0.7)");
+            g.addColorStop(1, "rgba(91,33,182,0.9)");
+        } else {
+            g.addColorStop(0, "rgba(0,212,255,0.28)");
+            g.addColorStop(1, "rgba(0,90,160,0.55)");
+        }
+        gradCache.tower[key] = g;
+        gradCache.towerSize = size;
+    }
+    return gradCache.tower[key];
+}
+
 /* ============ 二次元深色风格 Canvas 绘制辅助 ============ */
 const floatTexts = [];                   // 伤害飘字池
 const stars = [];                        // 缓慢下移星点粒子
@@ -852,27 +905,17 @@ function draw() {
     }
 
     // ===== 背景：深靛蓝渐变底（外扩 10px 防震屏露边）=====
-    const bgGrad = ctx.createLinearGradient(0, 0, 0, ch);
-    bgGrad.addColorStop(0, "#0b1426");
-    bgGrad.addColorStop(0.5, "#0d1a30");
-    bgGrad.addColorStop(1, "#0a1020");
-    ctx.fillStyle = bgGrad;
+    ctx.fillStyle = getBgGrad(cw, ch);
     ctx.fillRect(-10, -10, cw + 20, ch + 20);
 
     // ===== 漂移星云：缓慢游移的径向光斑，营造深空氛围 =====
     const n1x = cw * (0.28 + 0.08 * Math.sin(tSec * 0.13));
     const n1y = ch * (0.32 + 0.07 * Math.cos(tSec * 0.10));
-    const neb1 = ctx.createRadialGradient(n1x, n1y, 0, n1x, n1y, ch * 0.55);
-    neb1.addColorStop(0, "rgba(0,212,255,0.05)");
-    neb1.addColorStop(1, "rgba(0,212,255,0)");
-    ctx.fillStyle = neb1;
+    ctx.fillStyle = getNeb1(n1x, n1y, cw, ch);
     ctx.fillRect(-10, -10, cw + 20, ch + 20);
     const n2x = cw * (0.72 + 0.09 * Math.cos(tSec * 0.11));
     const n2y = ch * (0.66 + 0.08 * Math.sin(tSec * 0.14));
-    const neb2 = ctx.createRadialGradient(n2x, n2y, 0, n2x, n2y, ch * 0.5);
-    neb2.addColorStop(0, "rgba(124,58,237,0.06)");
-    neb2.addColorStop(1, "rgba(124,58,237,0)");
-    ctx.fillStyle = neb2;
+    ctx.fillStyle = getNeb2(n2x, n2y, cw, ch);
     ctx.fillRect(-10, -10, cw + 20, ch + 20);
 
     // ===== 极淡青蓝网格线（透明度 0.06） =====
@@ -1011,15 +1054,8 @@ function draw() {
         ctx.save();
         ctx.shadowColor = t.dual ? "rgba(124,58,237,0.7)" : "rgba(0,212,255,0.6)";
         ctx.shadowBlur = 10 + 8 * breathe;
-        const grad = ctx.createLinearGradient(px, py, px + innerSize, py + innerSize);
-        if (t.dual) {
-            grad.addColorStop(0, "rgba(124,58,237,0.7)");
-            grad.addColorStop(1, "rgba(91,33,182,0.9)");
-        } else {
-            grad.addColorStop(0, "rgba(0,212,255,0.28)");
-            grad.addColorStop(1, "rgba(0,90,160,0.55)");
-        }
-        ctx.fillStyle = grad;
+        // 使用缓存渐变（cellSize 不变时复用，避免每帧每塔重建）
+        ctx.fillStyle = getTowerGrad(t.dual, innerSize);
         roundRect(px + innerPad, py + innerPad, innerSize, innerSize, 10);
         ctx.fill();
         ctx.restore();
@@ -1775,6 +1811,13 @@ function initGameButtons() {
     $("#btn-cancel-sel").onclick = () => {
         clearTowerSelection();
         toast("已取消选择", "", 1000);
+    };
+
+    // 退出游戏到主菜单（游戏界面 HUD）
+    $("#btn-quit-game").onclick = async () => {
+        if (!confirm("确定退出本局游戏？将返回主菜单。")) return;
+        await api("/api/game/leave", { code: S.roomCode });
+        leaveToMenu();
     };
 
     // ============ 电脑键盘快捷键（"键位"） ============

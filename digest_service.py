@@ -128,6 +128,12 @@ def digest_view(ntype: str) -> dict[str, Any]:
         payload = {"type": ntype, "date": ndate, "points": [], "keywords": [],
                    "news_count": 0}
     payload.setdefault("window_bj", window_label(start, end))
+    # 历史数据没有 article 字段 → 现场用要点合成一篇连贯短评（仅展示，不写库）
+    if not payload.get("article"):
+        try:
+            payload["article"] = digest_engine.compose_article_from_points(payload)
+        except Exception:  # noqa: BLE001 —— 合成失败不影响原有要点展示
+            payload["article"] = None
     payload.update({
         "exists": True,
         "generator": str(row["generator"]),

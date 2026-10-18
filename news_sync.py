@@ -18,6 +18,7 @@ news_sync.py —— 新闻/总结的 GitHub 中转同步
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import threading
@@ -84,17 +85,37 @@ def _repo_sha(path: str) -> Optional[str]:
 
 
 def _list_dir(path: str, ref: str) -> list[str]:
-    """列出仓库目录下的文件名（api.github.com/contents）。"""
+    """
+    列出仓库目录下的文件名（api.github.com/contents）。
+    目录不存在（Worker 还没产出 digests/ 等）时返回空列表，而不是让整个同步失败。
+    """
     url: str = f"https://api.github.com/repos/{NEWS_REPO}/contents/{path}?ref={ref}"
-    data = _get_json(url)
+    try:
+        data = _get_json(url)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return []
+        raise
     if not isinstance(data, list):
         return []
     return [str(x.get("name") or "") for x in data if x.get("type") == "file"]
 
 
 def _raw(path: str, ref: str) -> str:
-    """取文件原始内容（raw.githubusercontent.com）。"""
-    return _get_text(f"https://raw.githubusercontent.com/{NEWS_REPO}/{ref}/{path}")
+    """
+    取文件原始内容。
+    优先 raw.githubusercontent.com；该域名在部分网络下会被重置，
+    失败时回退到 api.github.com/contents（base64 内联），两个域名都在白名单内。
+    """
+    try:
+        return _get_text(f"https://raw.githubusercontent.com/{NEWS_REPO}/{ref}/{path}")
+    except Exception:  # noqa: BLE001 —— 网络重置/超时 → 走 API 回退
+        url: str = f"https://api.github.com/repos/{NEWS_REPO}/contents/{path}?ref={ref}"
+        data = _get_json(url)
+        content: str = str((data or {}).get("content") or "")
+        if not content:
+            raise
+        return base64.b64decode(content).decode("utf-8")
 
 
 def _day_files(names: list[str]) -> list[str]:

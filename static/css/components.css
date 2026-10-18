@@ -1003,3 +1003,108 @@ textarea.input { min-height: 88px; resize: vertical; }
     .me-quick__item { transition: none; }
     .me-quick__item:hover { transform: none; }
 }
+
+/* ============================================================
+   每日总结 · 连贯短评（导语/主题段/名词解释/看法）
+   ============================================================ */
+.digest-article { margin-top: var(--sp-8); }
+
+/* 导语：略大字号 + 左侧主色竖线，起"提要"作用 */
+.digest-lead {
+    font-size: var(--fs-14);
+    line-height: 1.9;
+    color: var(--text-1);
+    padding: var(--sp-12) var(--sp-12);
+    margin-bottom: var(--sp-16);
+    border-left: 3px solid var(--c-primary);
+    border-radius: 0 var(--r-8) var(--r-8) 0;
+    background: rgba(79, 110, 247, 0.06);
+}
+
+/* 主题段 */
+.digest-sec { margin-bottom: var(--sp-16); }
+.digest-sec__title {
+    display: inline-block;
+    font-size: var(--fs-13);
+    font-weight: 700;
+    color: var(--c-primary);
+    margin-bottom: 6px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: rgba(79, 110, 247, 0.10);
+}
+.digest-sec__text {
+    font-size: var(--fs-14);
+    line-height: 1.95;
+    color: var(--text-1);
+    text-align: justify;
+}
+
+/* 名词解释 */
+.digest-glossary {
+    margin: var(--sp-16) 0;
+    padding: var(--sp-12) var(--sp-12);
+    border: 1px dashed var(--border-1);
+    border-radius: var(--r-8);
+    background: var(--bg-hover);
+}
+.digest-glossary__title {
+    font-size: var(--fs-13);
+    font-weight: 700;
+    color: var(--text-2);
+    margin-bottom: var(--sp-8);
+}
+.digest-glossary__list { margin: 0; }
+.digest-glossary__list dt {
+    font-size: var(--fs-13);
+    font-weight: 700;
+    color: var(--text-1);
+    margin-top: 8px;
+}
+.digest-glossary__list dt:first-child { margin-top: 0; }
+.digest-glossary__list dd {
+    margin: 2px 0 0 0;
+    font-size: var(--fs-12);
+    line-height: 1.8;
+    color: var(--text-2);
+}
+
+/* 结语：浅色块 + 强调 */
+.digest-outlook {
+    margin-top: var(--sp-16);
+    padding: var(--sp-12) var(--sp-12);
+    border-radius: var(--r-8);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.08));
+    border: 1px solid rgba(99, 102, 241, 0.18);
+}
+.digest-outlook__label {
+    font-size: var(--fs-12);
+    font-weight: 700;
+    color: var(--c-primary);
+    margin-bottom: 6px;
+}
+.digest-outlook p {
+    margin: 0;
+    font-size: var(--fs-14);
+    line-height: 1.9;
+    color: var(--text-1);
+    text-align: justify;
+}
+
+/* 原始要点折叠区 */
+.digest-raw { margin-top: var(--sp-16); }
+.digest-raw summary {
+    cursor: pointer;
+    font-size: var(--fs-12);
+    color: var(--text-3);
+    user-select: none;
+    padding: 6px 0;
+}
+.digest-raw summary:hover { color: var(--text-2); }
+
+/* 深色模式微调 */
+[data-theme="dark"] .digest-lead { background: rgba(99, 102, 241, 0.12); }
+[data-theme="dark"] .digest-glossary { background: rgba(255, 255, 255, 0.03); }
+[data-theme="dark"] .digest-outlook {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), rgba(139, 92, 246, 0.14));
+}

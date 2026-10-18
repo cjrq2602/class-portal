@@ -32,27 +32,58 @@
     <!-- ============ 全局轻提示 ============ -->
     <div id="toast" class="hidden"></div>
 
-    <!-- ============ 页面 1：主菜单 ============ -->
+    <!-- ============ 页面 1：主菜单（游戏封面） ============ -->
     <section id="page-menu" class="page">
-        <div class="card center-card menu-card panel panel-anim">
-            <h1>🌙 守夜小队</h1>
-            <div class="menu-title">多人合作塔防 · 一起守护营地</div>
-            <label class="field-label" for="input-nick">你的昵称</label>
-            <input id="input-nick" type="text" maxlength="12" placeholder="输入昵称，最多 12 字">
-            <div class="btn-row">
-                <button id="btn-quick" class="btn primary big">🚀 快速匹配</button>
+        <div class="cover panel panel-anim">
+            <!-- 封面顶部：标题 + 星轨装饰 -->
+            <div class="cover-head">
+                <div class="cover-badge">合作塔防 · 2~4 人</div>
+                <h1 class="cover-title">🌙 守夜小队</h1>
+                <p class="cover-sub">怪物沿着两条夜路逼近营地。建塔、放技能，和队友一起守到第 10 波。</p>
             </div>
-            <div class="btn-row">
-                <button id="btn-create" class="btn big">🏠 创建房间</button>
-                <button id="btn-join" class="btn big">🔑 房间码加入</button>
+
+            <!-- 昵称 -->
+            <div class="cover-field">
+                <label class="field-label" for="input-nick">你的昵称</label>
+                <input id="input-nick" type="text" maxlength="12" placeholder="输入昵称，最多 12 字">
             </div>
-            <div class="btn-row">
-                <button id="btn-lobby" class="btn ghost big">📋 游戏大厅</button>
+
+            <!-- 主操作：快速匹配（最醒目） -->
+            <button id="btn-quick" class="cover-primary">
+                <span class="cover-primary__icon">🚀</span>
+                <span class="cover-primary__body">
+                    <b>快速匹配</b>
+                    <small>30 秒内自动开局，人不满机器人补位</small>
+                </span>
+                <span class="cover-primary__arrow">→</span>
+            </button>
+
+            <!-- 次操作：两张卡片并排 -->
+            <div class="cover-grid">
+                <button id="btn-create" class="cover-tile">
+                    <span class="cover-tile__icon">🏠</span>
+                    <b>创建房间</b>
+                    <small>拿到房间码发给好友</small>
+                </button>
+                <button id="btn-join" class="cover-tile">
+                    <span class="cover-tile__icon">🔑</span>
+                    <b>房间码加入</b>
+                    <small>输入好友发来的码</small>
+                </button>
             </div>
-            <div class="menu-tips">
-                快速匹配 30 秒内自动开局（人不满机器人补位）<br>
-                把房间链接发给好友即可同房间作战
+
+            <!-- 底部：大厅 + 回网站首页 -->
+            <div class="cover-foot">
+                <button id="btn-lobby" class="cover-link">📋 游戏大厅</button>
+                <a class="cover-link cover-link--home" href="/">← 返回网站首页</a>
             </div>
+
+            <!-- 玩法速览 -->
+            <ul class="cover-rules">
+                <li>备战 45 秒建塔，开战后炮塔自动攻击</li>
+                <li>漏 10 只怪营地失守；击杀得金币可升级</li>
+                <li>加好友同一房间，双人塔威力翻倍</li>
+            </ul>
         </div>
     </section>
 

@@ -60,6 +60,10 @@ def advance_state(state: dict[str, Any], ts: float) -> bool:
     """
     将状态从 last_tick_at 推进到 ts（含阶段切换 + 战斗帧模拟）。
     返回状态是否发生变化（无变化不写库、version 不涨，前端收到 changed:false）。
+
+    【关键时序】先补算战斗帧，再切阶段：
+    若先切阶段（旧实现），长时间无人轮询后一个请求会把整波怪按"强制漏怪"
+    结算掉，导致玩家回来时直接跳到下一波。现在必须先模拟到阶段结束才允许切。
     """
     if state["phase"] in ("victory", "defeat"):
         return False  # 终局不再模拟
@@ -67,7 +71,34 @@ def advance_state(state: dict[str, Any], ts: float) -> bool:
     changed: bool = False
     last: float = float(state["last_tick_at"])
 
-    # ---- 阶段推进（不依赖帧模拟，直接按墙钟切换）----
+    # ---- 闲置暂停：超过阈值无任何请求 → 视为全员离开，整体顺延时间轴 ----
+    # 这样"关掉页面再回来"不会发现游戏已经跑完好几波。
+    idle_gap: float = ts - last
+    if idle_gap > config.IDLE_PAUSE_SECONDS:
+        state["phase_end_at"] = float(state["phase_end_at"]) + idle_gap
+        if state.get("battle_started_at"):
+            state["battle_started_at"] = float(state["battle_started_at"]) + idle_gap
+        if state.get("revive_window_until"):
+            state["revive_window_until"] = float(state["revive_window_until"]) + idle_gap
+        if state.get("next_bot_act_at"):
+            state["next_bot_act_at"] = float(state["next_bot_act_at"]) + idle_gap
+        state["last_tick_at"] = ts
+        return True
+
+    # ---- 战斗帧模拟（必须先补算，再切阶段）----
+    if state["phase"] == "battle":
+        target: float = min(ts, float(state["phase_end_at"]))
+        elapsed: float = max(0.0, target - last)
+        ticks: int = min(int(elapsed / config.TICK_SECONDS), config.MAX_CATCHUP_TICKS)
+        for _ in range(ticks):
+            _simulate_tick(state, config.TICK_SECONDS)
+            changed = True
+        state["last_tick_at"] = max(last, last + ticks * config.TICK_SECONDS)
+        # 还没模拟到阶段结束（补算被上限截断）→ 本次不切阶段，留给下次请求
+        if state["last_tick_at"] < float(state["phase_end_at"]) - config.TICK_SECONDS:
+            return changed
+
+    # ---- 阶段推进（此时战斗已模拟到边界，可安全结算）----
     changed = _advance_phase(state, ts) or changed
 
     # ---- 机器人自主建塔：备战期每 5 秒最多建 1 座（限频防金币秒空）----
@@ -75,18 +106,11 @@ def advance_state(state: dict[str, Any], ts: float) -> bool:
         state["next_bot_act_at"] = ts + 5.0
         changed = bot_act(state) or changed
 
-    # ---- 战斗帧模拟（仅战斗阶段）----
+    # 游标推进到"已模拟到的时刻"，防止重复补算
     if state["phase"] == "battle":
-        elapsed: float = ts - last
-        ticks: int = min(int(elapsed / config.TICK_SECONDS), config.MAX_CATCHUP_TICKS)
-        for _ in range(ticks):
-            _simulate_tick(state, config.TICK_SECONDS)
-            changed = True
-
-    # 游标推进到"已模拟到的时刻"，防止重复补算；封顶时留给下次继续
-    if state["phase"] == "battle":
-        simulated_to: float = min(ts, last + config.MAX_CATCHUP_TICKS * config.TICK_SECONDS)
-        state["last_tick_at"] = max(last, simulated_to)
+        state["last_tick_at"] = max(
+            float(state["last_tick_at"]),
+            min(ts, float(state["phase_end_at"])))
     else:
         state["last_tick_at"] = ts
     return changed

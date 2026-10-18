@@ -34,7 +34,58 @@
             · 生成于 {{ view.updated_at }}
         </div>
 
+        {% if view.article and view.article.paragraphs %}
+        <!-- 连贯中文短评：导语 → 主题段 → 名词解释 → 看法 -->
+        <div class="digest-article">
+            {% for p in view.article.paragraphs %}
+                {% if p.kind == 'lead' %}
+                <p class="digest-lead">{{ p.text }}</p>
+                {% elif p.kind == 'section' %}
+                <section class="digest-sec">
+                    <h3 class="digest-sec__title">{{ p.heading }}</h3>
+                    <p class="digest-sec__text">{{ p.text }}</p>
+                    {% if p.refs %}
+                    <div class="digest-point__refs">
+                        {% for r in p.refs %}
+                        <a class="digest-point__ref" href="{{ r.url }}" target="_blank"
+                           rel="noopener noreferrer">{{ r.source }}：{{ r.title[:24] }}…</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </section>
+                {% elif p.kind == 'glossary' %}
+                <section class="digest-glossary">
+                    <div class="digest-glossary__title">📖 名词解释</div>
+                    <dl class="digest-glossary__list">
+                        {% for g in p['items'] %}
+                        <dt>{{ g.term }}</dt>
+                        <dd>{{ g.desc }}</dd>
+                        {% endfor %}
+                    </dl>
+                </section>
+                {% elif p.kind == 'outlook' %}
+                <section class="digest-outlook">
+                    <div class="digest-outlook__label">💭 一点看法</div>
+                    <p>{{ p.text }}</p>
+                </section>
+                {% endif %}
+            {% endfor %}
+        </div>
+
         {% if view.points %}
+        <details class="digest-raw">
+            <summary>查看原始要点（{{ view.points|length }} 条）</summary>
+            <div class="stagger mt-8">
+                {% for p in view.points %}
+                <div class="digest-point">
+                    <span class="digest-point__idx num">{{ loop.index }}</span>
+                    <div style="min-width:0">{{ p.text }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+        {% elif view.points %}
         <div class="stagger">
             {% for p in view.points %}
             <div class="digest-point">

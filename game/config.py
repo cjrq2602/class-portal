@@ -12,9 +12,11 @@ from typing import Any
 # ---------------- 阶段时长（秒） ----------------
 PREP_TIME: int = 45          # 备战阶段时长
 WAVE_BREAK: int = 8          # 波次结算/休整时长
-MAX_CATCHUP_TICKS: int = 120 # 惰性结算单次补算帧数上限（防 CPU 爆炸）
+MAX_CATCHUP_TICKS: int = 600 # 惰性结算单次补算帧数上限（60 秒；防 CPU 爆炸）
 TICK_SECONDS: float = 0.1    # 每逻辑帧 0.1 秒（战斗阶段 1 秒 = 10 帧）
 FINAL_WAVE: int = 10         # 打完第 10 波即胜利
+# 闲置暂停：超过该秒数无任何状态请求（全员离开）→ 时间轴整体顺延，游戏冻结
+IDLE_PAUSE_SECONDS: float = 30.0
 
 # ---------------- 地图 ----------------
 # 网格 12x8；两条怪物行进路径（沿格子中心），单条路径、无分叉（CPU 友好）

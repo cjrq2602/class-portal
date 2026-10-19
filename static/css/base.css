@@ -6,6 +6,14 @@
 /* ---- reset ---- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-text-size-adjust: 100%; }
+/* 氛围底图（浅色模式）：伪元素 fixed 方案 —— iOS 不支持
+   background-attachment:fixed + cover，固定伪元素是通用绕行写法。
+   z-index:-1 画在画布背景之上、内容之下；深色模式在 dark.css 中关闭。 */
+body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1;
+    background: url("/static/img/bg-aurora.jpg") center / cover no-repeat;
+    pointer-events: none;
+}
 body {
     font-family: var(--font-family);
     font-size: var(--fs-14);

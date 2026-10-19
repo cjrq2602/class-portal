@@ -35,6 +35,9 @@
     color-scheme: dark;  /* 滚动条/表单控件跟随深色 */
 }
 
+/* 深色模式关闭氛围底图（浅底图会破坏深色对比度），回退纯色 */
+[data-theme="dark"] body::before { content: none; }
+
 /* 主题切换按钮的日/月图标状态 */
 #theme-toggle .icon-sun { display: none; }
 #theme-toggle .icon-moon { display: inline-block; }

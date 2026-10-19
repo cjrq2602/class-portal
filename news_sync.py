@@ -33,7 +33,7 @@ import portal_db
 # 配置（部署时按需修改或通过环境变量覆盖）
 # ============================================================
 # 新闻仓库：形如 "用户名/仓库名"；改错可用来验证"GitHub 不可达"降级表现
-NEWS_REPO: str = os.environ.get("NEWS_REPO", "yourname/class-portal-news")
+NEWS_REPO: str = os.environ.get("NEWS_REPO", "cjrq2602/class-portal-news")
 NEWS_BRANCH: str = os.environ.get("NEWS_BRANCH", "main")
 # 可选：配了 token 可把 api.github.com 限速从 60 次/小时提升到 5000
 NEWS_GITHUB_TOKEN: str = os.environ.get("NEWS_GITHUB_TOKEN", "")

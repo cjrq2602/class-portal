@@ -45,10 +45,9 @@ def handle_action(room_id: int, player_id: int, action: dict[str, Any]) -> tuple
     if ok:
         # 备战期顺手让机器人建一座塔（合作感），并把状态写回
         logic.bot_act(state)
-        import json as _json
-        row = db.get_game_state(room_id)
-        ver: int = int(row["version"])
-        db.put_game_state(room_id, ver + 1, _json.dumps(state, ensure_ascii=False))
+        # 动作结果立即落库（force_save 走缓存锁 + 最新版本 CAS，
+        # 避免覆盖/被覆盖并发轮询的推进；原版这里无条件直写旧版本）
+        logic.force_save(room_id, state)
     return ok, msg
 
 

@@ -13,6 +13,7 @@ game/logic.py —— 服务端权威游戏逻辑 + 惰性结算（核心）
 from __future__ import annotations
 
 import json
+import threading
 import time
 from typing import Any, Optional
 
@@ -22,38 +23,119 @@ from game import config, entities
 
 
 # ============================================================
+# 进程内状态缓存 + 落库节流（热路径优化）
+# ============================================================
+# 背景：原版每次轮询都 json.loads + 模拟 + json.dumps + 写库，
+# 战斗期 changed 恒为 True → 4 人房 8 次/秒全量写 SQLite。
+# 在慢盘/限 CPU 的 PythonAnywhere 上写事务互相排队 = 全员卡顿。
+# 现在：对局状态驻留进程内存，同一房间最多每 _SAVE_MIN_INTERVAL
+# 秒落库一次；响应版本 = 已落库版本，未落库的推进只体现在下一次
+# 全量响应内容里（前端插值不受影响）。多 worker 安全：落库仍走
+# 乐观锁，冲突时重读合并，时间轴模拟按时间戳重算可自愈。
+_SAVE_MIN_INTERVAL: float = 0.9   # 同一房间两次落库最小间隔（秒）
+_REVALIDATE_SECONDS: float = 2.0  # 干净缓存超过该秒数回库校验（多 worker 安全网）
+_CACHE_MAX: int = 128             # 缓存房间数上限，超出逐出最久未读
+
+_CACHE: dict[int, dict[str, Any]] = {}
+_CACHE_LOCK: threading.Lock = threading.Lock()
+
+
+def _evict_cache() -> None:
+    """缓存超限时逐出"干净且最久未读"的条目（脏条目保留等落库）。"""
+    if len(_CACHE) <= _CACHE_MAX:
+        return
+    for rid, ent in sorted(_CACHE.items(), key=lambda kv: kv[1]["db_read_at"]):
+        if len(_CACHE) <= _CACHE_MAX:
+            break
+        if not ent["dirty"]:
+            _CACHE.pop(rid, None)
+
+
+def _persist_locked(room_id: int, entry: dict[str, Any], ts: float) -> None:
+    """乐观锁落库；被其他 worker 抢先则以库为准重载（本地推进丢弃）。"""
+    if put_game_state(room_id, entry["db_version"] + 1,
+                      json.dumps(entry["state"], ensure_ascii=False)):
+        entry["db_version"] += 1
+        entry["dirty"] = False
+        entry["saved_at"] = ts
+        entry["db_read_at"] = ts
+        return
+    row = get_game_state(room_id)
+    if row is not None:
+        entry["state"] = json.loads(row["state_json"])
+        entry["db_version"] = int(row["version"])
+    entry["dirty"] = False
+    entry["saved_at"] = ts
+    entry["db_read_at"] = ts
+
+
+# ============================================================
 # 惰性结算主入口
 # ============================================================
 
 def advance_and_save(room_id: int) -> tuple[dict[str, Any], int]:
     """
-    把房间对局状态推进到当前时刻并落库。
-    返回 (state, version)。乐观锁失败则重读重算一次（极少发生）。
+    把房间对局状态推进到当前时刻。
+    返回 (state, version)：state 为进程内权威对象（动作层可直接改后
+    调 force_save），version 为已落库版本（前端据此判断 changed）。
     """
-    state: dict[str, Any] = {}
-    version: int = 0
-    for _ in range(2):  # 最多自旋 2 次防活锁
-        row = get_game_state(room_id)
-        if row is None:
-            raise ValueError("对局状态不存在")
-        state = json.loads(row["state_json"])
-        version = int(row["version"])
-        changed: bool = advance_state(state, time.time())
-        if not changed:
-            break
-        if put_game_state(room_id, version + 1, json.dumps(state, ensure_ascii=False)):
-            version += 1
-            break
-    # 终局收尾（战绩统计 / 房间状态），用 finalized 标志保证只做一次
-    if state.get("phase") in ("victory", "defeat") and not state.get("finalized"):
-        try:
-            finish_game(room_id, state)
-            state["finalized"] = True
-            if put_game_state(room_id, version + 1, json.dumps(state, ensure_ascii=False)):
-                version += 1
-        except Exception:
-            pass
-    return state, version
+    with _CACHE_LOCK:
+        ts: float = time.time()
+        entry: Optional[dict[str, Any]] = _CACHE.get(room_id)
+        # 无缓存，或干净缓存到期（多 worker 安全网）→ 回库重读
+        if entry is None or (
+                not entry["dirty"] and ts - float(entry["db_read_at"]) > _REVALIDATE_SECONDS):
+            row = get_game_state(room_id)
+            if row is None:
+                _CACHE.pop(room_id, None)
+                raise ValueError("对局状态不存在")
+            entry = {"state": json.loads(row["state_json"]),
+                     "db_version": int(row["version"]), "dirty": False,
+                     "saved_at": 0.0, "db_read_at": ts}
+            _CACHE[room_id] = entry
+            _evict_cache()
+
+        state: dict[str, Any] = entry["state"]
+        if advance_state(state, ts):
+            entry["dirty"] = True
+
+        # 节流落库：脏且距上次落库够久才写
+        if entry["dirty"] and ts - float(entry["saved_at"]) >= _SAVE_MIN_INTERVAL:
+            _persist_locked(room_id, entry, ts)
+            state = entry["state"]  # 冲突重载后对象可能已换
+
+        # 终局收尾（战绩统计 / 房间状态），finalized 标志保证只做一次，立即落库
+        if state.get("phase") in ("victory", "defeat") and not state.get("finalized"):
+            try:
+                finish_game(room_id, state)
+                state["finalized"] = True
+                entry["dirty"] = True
+                _persist_locked(room_id, entry, time.time())
+                state = entry["state"]
+            except Exception:
+                pass
+        return state, int(entry["db_version"])
+
+
+def force_save(room_id: int, state: dict[str, Any]) -> None:
+    """
+    玩家动作后的立即落库：动作无法由时间轴重算（不同于模拟推进），
+    必须马上持久化。读最新库版本 CAS 写入，微冲突重试一次；
+    成功后同步进程缓存，避免缓存里的旧版本回写覆盖动作结果。
+    """
+    with _CACHE_LOCK:
+        ts: float = time.time()
+        payload: str = json.dumps(state, ensure_ascii=False)
+        for _ in range(2):
+            row = get_game_state(room_id)
+            if row is None:
+                return
+            ver: int = int(row["version"])
+            if put_game_state(room_id, ver + 1, payload):
+                _CACHE[room_id] = {"state": state, "db_version": ver + 1,
+                                   "dirty": False, "saved_at": ts, "db_read_at": ts}
+                return
+        # 极端并发下放弃本次写入，下次轮询以库为准（前端会再拉全量）
 
 
 def advance_state(state: dict[str, Any], ts: float) -> bool:

@@ -319,3 +319,45 @@ def get_chat_since(room_id: int, since_id: int) -> list[sqlite3.Row]:
             " WHERE c.room_id=? AND c.id>? ORDER BY c.id LIMIT 50",
             (room_id, since_id),
         ).fetchall()
+
+
+# ---------------- 轮询热路径合并查询（一次连接取多件，省连接开关销） ----------------
+
+def state_poll_prefetch(code: str, token: str) -> tuple[
+        Optional[sqlite3.Row], Optional[sqlite3.Row], bool]:
+    """
+    /api/game/state 合并首查：token→玩家、code→房间、是否成员。
+    替代原先 get_player_by_token + get_room_by_code + find_player_seat
+    三次独立连接（连接开关是慢盘部署上的主要开销）。
+    """
+    with get_db() as conn:
+        player: Optional[sqlite3.Row] = None
+        if token:
+            player = conn.execute(
+                "SELECT * FROM players WHERE token=?", (token,)).fetchone()
+        room: Optional[sqlite3.Row] = conn.execute(
+            "SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
+        is_member: bool = False
+        if room is not None and player is not None:
+            r = conn.execute(
+                "SELECT 1 AS x FROM room_players WHERE room_id=? AND player_id=?",
+                (int(room["id"]), int(player["id"]))).fetchone()
+            is_member = r is not None
+        return player, room, is_member
+
+
+def state_poll_extras(room_id: int, chat_since: int) -> tuple[
+        list[sqlite3.Row], list[sqlite3.Row]]:
+    """一次连接：房间成员（含昵称/战绩） + 聊天增量（原两次独立连接）。"""
+    with get_db() as conn:
+        members = conn.execute(
+            "SELECT rp.*, p.nickname, p.wins, p.games FROM room_players rp"
+            " JOIN players p ON p.id = rp.player_id"
+            " WHERE rp.room_id=? ORDER BY rp.seat",
+            (room_id,)).fetchall()
+        chat = conn.execute(
+            "SELECT c.id, c.text, c.created_at, p.nickname FROM chat_messages c"
+            " LEFT JOIN players p ON p.id=c.player_id"
+            " WHERE c.room_id=? AND c.id>? ORDER BY c.id LIMIT 50",
+            (room_id, chat_since)).fetchall()
+        return members, chat

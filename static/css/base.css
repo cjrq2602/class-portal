@@ -47,10 +47,10 @@ h3 { font-size: var(--fs-18); line-height: 1.4; }
     [class^="col-"], [class*=" col-"] { grid-column: span 1; }
 }
 
-/* ---- 页面主区（给固定导航/底部 Tab 留白） ---- */
+/* ---- 页面主区（给固定导航/底部悬浮玻璃 Tab 留白） ---- */
 .page-body { padding: 76px 0 32px; }
 @media (max-width: 767px) {
-    .page-body { padding: 64px 0 84px; }  /* 底部 Tab 栏占位 */
+    .page-body { padding: 64px 0 104px; }  /* 底部悬浮 Tab 坞占位 */
 }
 
 /* ---- 工具类 ---- */
@@ -71,6 +71,32 @@ h3 { font-size: var(--fs-18); line-height: 1.4; }
 .gap-8 { gap: var(--sp-8); } .gap-12 { gap: var(--sp-12); }
 .gap-16 { gap: var(--sp-16); } .gap-24 { gap: var(--sp-24); }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- 页面切换过渡（fx.js 协调：点击 Tab 先播退出动画再跳转；
+   新页面加载时入场动画自动播放一次。bfcache 恢复不重播） ---- */
+@keyframes page-enter {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes tabbar-enter {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.page-body { animation: page-enter var(--dur-mid) var(--ease); }
+.tabbar    { animation: tabbar-enter var(--dur-slow) var(--ease); }
+/* 退出态：内容轻微下沉淡出，Tab 坞下滑消失（由 fx.js 加 .is-leaving 触发） */
+body.is-leaving .page-body {
+    animation: none;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 140ms ease-in, transform 140ms ease-in;
+}
+body.is-leaving .tabbar {
+    animation: none;
+    opacity: 0; transform: translateY(10px);
+    transition: opacity 130ms ease-in, transform 130ms ease-in;
+}
+/* bfcache 恢复（手势返回上一页）：不重播入场动画，避免闪烁 */
+body.no-enter-anim .page-body, body.no-enter-anim .tabbar { animation: none; }
 
 /* ---- 列表入场 stagger 淡入（吐槽/新闻等列表通用） ---- */
 @keyframes rise-in {

@@ -26,6 +26,7 @@ const ADMIN_MODULES = [
     { key: "checkin", name: "打卡挑战", icon: "target", perm: "checkin.manage" },
     { key: "roster", name: "点名名单", icon: "zap", perm: "roster.manage" },
     { key: "links", name: "资源导航", icon: "link", perm: "link.manage" },
+    { key: "settings", name: "站点设置", icon: "settings", perm: "admin.access" },
     /* 登录日志仅 root 角色或 admin.full 可见（init 里做自定义判断） */
     { key: "loginlogs", name: "登录日志", icon: "shield", perm: "admin.full" },
     { key: "audit", name: "审计日志", icon: "file-text", perm: "audit.view" },
@@ -84,7 +85,7 @@ function switchModule(key) {
         activities: renderActAdmin, homework: renderHwAdmin,
         resources: renderResAdmin, duty: renderDutyAdmin, honors: renderHonorAdmin,
         quote: renderQuoteAdmin, checkin: renderCheckinAdmin, roster: renderRosterAdmin,
-        links: renderLinksAdmin, loginlogs: renderLoginLogs,
+        links: renderLinksAdmin, settings: renderSiteSettings, loginlogs: renderLoginLogs,
     }[key])(c);
 }
 
@@ -1659,4 +1660,34 @@ async function renderLinksAdmin(c) {
             } catch (e) { /* 已提示 */ }
         };
     });
+}
+
+/* ================= 站点设置 ================= */
+async function renderSiteSettings(c) {
+    c.innerHTML = `<div class="card">
+        <div class="card__title">${icon("settings", 18)} 站点设置</div>
+        <div class="text-faint mt-8" style="font-size:var(--fs-13)">可在后台修改、全站生效的全局配置。</div>
+        <div class="field mt-16">
+            <label class="field__label">GitHub 仓库链接</label>
+            <input class="input" id="gh-url" type="url" maxlength="200"
+                placeholder="https://github.com/你的组织/仓库" style="max-width:520px">
+            <div class="text-faint mt-8" style="font-size:var(--fs-12)">
+                留空则不在前台展示 GitHub 入口。配置后显示在「设置 → 关于」中。
+            </div>
+            <div class="mt-16"><button class="btn btn--primary" id="gh-save">保存</button></div>
+        </div>
+    </div>`;
+    try {
+        const r = await fetchJSON("/api/admin/settings/github");
+        document.getElementById("gh-url").value = r.github_url || "";
+    } catch (e) { /* 已提示 */ }
+    document.getElementById("gh-save").onclick = async () => {
+        const url = document.getElementById("gh-url").value.trim();
+        try {
+            await fetchJSON("/api/admin/settings/github", {
+                method: "POST", body: { github_url: url },
+            });
+            Toast.show("已保存", "success");
+        } catch (e) { /* 已提示 */ }
+    };
 }

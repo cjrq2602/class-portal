@@ -199,6 +199,7 @@ def create_app() -> Flask:
                 "nav_top": blocks.top_items(),
                 "nav_groups": blocks.dropdowns(),
                 "nav_tabs": blocks.tab_items(),
+                "github_url": portal_db.setting_get("github_url", ""),
                 "static_v": app.config["STATIC_V"]}
 
     # ---- 全局安全响应头 + 慢请求日志 ----

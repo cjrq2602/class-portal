@@ -198,6 +198,11 @@
                 守夜广场 · 班级门户<br>
                 主题与语言设置保存在本机浏览器，不影响其他同学。
             </div>
+            {% if github_url %}
+            <div class="set-row mt-12">
+                <a class="btn btn--outline btn--sm" href="{{ github_url }}" target="_blank" rel="noopener">源码仓库</a>
+            </div>
+            {% endif %}
         </div>
     </div>
 </aside>

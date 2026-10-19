@@ -556,3 +556,28 @@ def api_link_sub_review():
         _audit("link_sub_reject", str(sub["name"]))
         return common.ok()
     return common.err("action 需为 approve 或 reject")
+
+
+# ============================================================
+# 站点设置（可后台修改、全站生效的全局配置） —— admin.access
+# ============================================================
+@bp.route("/api/admin/settings/github")
+@require_perm("admin.access")
+@common.api_wrap
+def api_setting_github_get():
+    """读取站点 GitHub 仓库链接。权限：admin.access"""
+    return common.ok({"github_url": portal_db.setting_get("github_url", "")})
+
+
+@bp.route("/api/admin/settings/github", methods=["POST"])
+@require_perm("admin.access")
+@common.api_wrap
+def api_setting_github_set():
+    """修改站点 GitHub 仓库链接。参数：{github_url}。权限：admin.access"""
+    body: dict = request.get_json(silent=True) or {}
+    url: str = str(body.get("github_url", "")).strip()[:200]
+    if url and not _valid_url(url):
+        return common.err("链接需以 http:// 或 https:// 开头")
+    portal_db.setting_put("github_url", url)
+    _audit("set_github_url", url)
+    return common.ok()

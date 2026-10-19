@@ -129,7 +129,7 @@ def api_register():
         return common.err("名额已满", "full")
     added: bool = portal_db.act_register(aid, uid)
     portal_db.add_audit(uid, "activity_register", str(aid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     count = portal_db.act_reg_count(aid)
     return common.ok({"registered": True, "already": not added, "reg_count": count})
 
@@ -153,7 +153,7 @@ def api_unregister():
         return common.err("活动已结束，无法取消")
     removed: bool = portal_db.act_unregister(aid, uid)
     portal_db.add_audit(uid, "activity_unregister", str(aid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"registered": False, "removed": removed,
                       "reg_count": portal_db.act_reg_count(aid)})
 
@@ -257,7 +257,7 @@ def api_admin_create():
     if tag_ids:
         portal_db.act_set_tags(aid, tag_ids)
     portal_db.add_audit(auth_bp.current_user_id(), "activity_create", title,
-                        f"id={aid}", request.remote_addr or "")
+                        f"id={aid}", common.client_ip())
     return common.ok({"id": aid})
 
 
@@ -312,7 +312,7 @@ def api_admin_update():
     if body.get("tag_ids") is not None:
         portal_db.act_set_tags(aid, [int(x) for x in body["tag_ids"] if str(x).isdigit()])
     portal_db.add_audit(auth_bp.current_user_id(), "activity_update", str(aid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -332,7 +332,7 @@ def api_admin_hide():
     portal_db.act_update(aid, hidden=1 if hidden else 0)
     portal_db.add_audit(auth_bp.current_user_id(),
                         "activity_hide" if hidden else "activity_show", str(aid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -377,7 +377,7 @@ def api_admin_tag_create():
     except Exception:  # noqa: BLE001 —— 名称唯一约束
         return common.err("标签已存在")
     portal_db.add_audit(auth_bp.current_user_id(), "tag_create", name, "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"id": tid})
 
 
@@ -393,5 +393,5 @@ def api_admin_tag_delete():
         return common.err("id 不合法")
     portal_db.tag_delete(tid)
     portal_db.add_audit(auth_bp.current_user_id(), "tag_delete", str(tid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()

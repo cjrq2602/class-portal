@@ -111,7 +111,7 @@ def api_set():
     task: str = str(body.get("task", "")).strip()[:100]
     portal_db.duty_set(d, group_name, members, task)
     portal_db.add_audit(auth_bp.current_user_id(), "duty_set", DOW_NAMES[d],
-                        f"{group_name}/{members}"[:100], request.remote_addr or "")
+                        f"{group_name}/{members}"[:100], common.client_ip())
     return common.ok()
 
 
@@ -129,7 +129,7 @@ def api_delete():
         return common.err("星期必须是 0~6")
     portal_db.duty_delete(d)
     portal_db.add_audit(auth_bp.current_user_id(), "duty_clear", DOW_NAMES[d], "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -147,5 +147,5 @@ def api_rotate():
         return common.err("该操作需要二次确认（confirm=true）", "need_confirm")
     affected: int = portal_db.duty_rotate()
     portal_db.add_audit(auth_bp.current_user_id(), "duty_rotate", "week",
-                        f"affected_days={affected}", request.remote_addr or "")
+                        f"affected_days={affected}", common.client_ip())
     return common.ok({"affected": affected})

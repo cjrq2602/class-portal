@@ -160,7 +160,7 @@ def api_tucao_post():
     hit: Optional[str] = sensitive.check(content)
     if hit:
         portal_db.add_audit(uid, "tucao_blocked", hit,
-                            f"len={len(content)}", request.remote_addr or "")
+                            f"len={len(content)}", common.client_ip())
         return common.err("内容包含不合适词汇，请修改后重试", "sensitive")
 
     # 防刷：DB 计数（跨进程重启仍有效，比纯内存更稳）
@@ -174,7 +174,7 @@ def api_tucao_post():
     anon_name: str = make_anon_name() if persona == "anon" else ""
     pid: int = portal_db.tucao_insert(uid, content, persona, anon_name, status)
     portal_db.add_audit(uid, "tucao_post", str(pid),
-                        f"persona={persona} status={status}", request.remote_addr or "")
+                        f"persona={persona} status={status}", common.client_ip())
     return common.ok({"id": pid, "status": status,
                       "message": "已发布" if status == "ok" else "已提交，等待管理员审核"})
 
@@ -231,7 +231,7 @@ def api_tucao_report():
         return common.err("帖子不存在", "not_found", 404)
     first: bool = portal_db.tucao_report(post_id, uid, reason)
     portal_db.add_audit(uid, "tucao_report", str(post_id), reason[:100],
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"first": first})
 
 
@@ -284,7 +284,7 @@ def api_admin_tucao_moderate():
     else:
         return common.err("action 不合法")
     portal_db.add_audit(auth_bp.current_user_id(), f"tucao_{action}", str(post_id),
-                        "", request.remote_addr or "")
+                        "", common.client_ip())
     return common.ok()
 
 
@@ -344,7 +344,7 @@ def api_sensitive_add():
     if not ok_added:
         return common.err("该词已存在")
     portal_db.add_audit(auth_bp.current_user_id(), "sensitive_add", word, "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -360,7 +360,7 @@ def api_sensitive_delete():
         return common.err("id 不合法")
     portal_db.sensitive_delete(wid)
     portal_db.add_audit(auth_bp.current_user_id(), "sensitive_delete", str(wid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -385,5 +385,5 @@ def api_tucao_settings_set():
         return common.err("mode 不合法")
     portal_db.setting_put(MODE_KEY, mode)
     portal_db.add_audit(auth_bp.current_user_id(), "tucao_mode", mode, "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"mode": mode})

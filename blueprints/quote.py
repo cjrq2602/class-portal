@@ -134,7 +134,7 @@ def api_submit():
     if hit:
         return common.err("内容包含不合适词汇，请修改后重试", "sensitive")
     qid: int = portal_db.quote_create(content, author, uid)
-    portal_db.add_audit(uid, "quote_submit", str(qid), "", request.remote_addr or "")
+    portal_db.add_audit(uid, "quote_submit", str(qid), "", common.client_ip())
     return common.ok({"id": qid, "status": "pending",
                       "message": "已提交，等待管理员审核"})
 
@@ -206,7 +206,7 @@ def api_admin_review():
     status: str = "approved" if action == "approve" else "rejected"
     portal_db.quote_review(qid, status, auth_bp.current_user_id())
     portal_db.add_audit(auth_bp.current_user_id(), f"quote_{action}", str(qid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"status": status})
 
 
@@ -222,5 +222,5 @@ def api_admin_delete():
         return common.err("id 不合法")
     portal_db.quote_delete(qid)
     portal_db.add_audit(auth_bp.current_user_id(), "quote_delete", str(qid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()

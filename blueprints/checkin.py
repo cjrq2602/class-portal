@@ -119,7 +119,7 @@ def api_do():
         return common.err("该挑战当前不在进行期内")
     added: bool = portal_db.ck_add(uid, cid, today)     # 幂等
     portal_db.add_audit(uid, "checkin", f"{cid}/{today}", "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"already": not added, "date": today,
                       "streak": portal_db.ck_streak(uid, cid, today)})
 
@@ -239,7 +239,7 @@ def api_admin_create():
     cid: int = portal_db.chal_create(name, icon, start_date, end_date,
                                      auth_bp.current_user_id())
     portal_db.add_audit(auth_bp.current_user_id(), "challenge_create", name,
-                        f"id={cid} {start_date}~{end_date}", request.remote_addr or "")
+                        f"id={cid} {start_date}~{end_date}", common.client_ip())
     return common.ok({"id": cid})
 
 
@@ -255,7 +255,7 @@ def api_admin_delete():
         return common.err("id 不合法")
     portal_db.chal_delete(cid)
     portal_db.add_audit(auth_bp.current_user_id(), "challenge_delete", str(cid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -269,5 +269,5 @@ def api_admin_archive():
     """
     n: int = portal_db.chal_archive_expired(common.bj_date_str())
     portal_db.add_audit(auth_bp.current_user_id(), "challenge_archive", "expired",
-                        f"count={n}", request.remote_addr or "")
+                        f"count={n}", common.client_ip())
     return common.ok({"archived": n})

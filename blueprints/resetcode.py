@@ -126,7 +126,7 @@ def api_generate():
     portal_db.add_audit(operator_id, "reset_code_gen",
                         str(target["username"]),
                         f"expires_in={common.RESET_CODE_TTL_SECONDS}s",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({
         "code": code,
         "target_username": str(target["username"]),

@@ -116,7 +116,7 @@ def api_digest_regenerate():
     portal_db.add_audit(auth_bp.current_user_id(), "digest_regenerate",
                         f"{ntype}/{payload.get('date')}",
                         f"points={len(payload.get('points') or [])}",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"digest": payload})
 
 
@@ -140,7 +140,7 @@ def api_digest_edit():
     except ValueError as e:
         return common.err(str(e))
     portal_db.add_audit(auth_bp.current_user_id(), "digest_edit", f"{ntype}/{ndate}",
-                        f"points={len(points)}", request.remote_addr or "")
+                        f"points={len(points)}", common.client_ip())
     return common.ok({"digest": payload})
 
 

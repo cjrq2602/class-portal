@@ -158,7 +158,7 @@ def api_admin_create():
         return common.err(f"截止时间格式有误：{e}")
     hid: int = portal_db.hw_create(subject, content, due_at, auth_bp.current_user_id())
     portal_db.add_audit(auth_bp.current_user_id(), "homework_create", subject,
-                        f"id={hid}", request.remote_addr or "")
+                        f"id={hid}", common.client_ip())
     return common.ok({"id": hid})
 
 
@@ -182,7 +182,7 @@ def api_admin_update():
         return common.err(f"截止时间格式有误：{e}")
     portal_db.hw_update(hid, subject, content, due_at)
     portal_db.add_audit(auth_bp.current_user_id(), "homework_update", str(hid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -198,5 +198,5 @@ def api_admin_delete():
         return common.err("id 不合法")
     portal_db.hw_delete(hid)
     portal_db.add_audit(auth_bp.current_user_id(), "homework_delete", str(hid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()

@@ -99,12 +99,30 @@ def _err(msg: str, code: int = 400):
 # ============================================================
 # 游戏 API（全部 /api/game/* 前缀；逻辑与原实现一字不差）
 # ============================================================
+# touch_player 节流：活跃标记精确到 10 秒足够（大厅"5 分钟内在线"判定），
+# 原版每次轮询都全库写一次，是热路径写放大来源之一
+_TOUCH_AT: dict[int, float] = {}
+
+
+def _touch_throttled(pid: int) -> None:
+    now_ts: float = time.time()
+    if now_ts - _TOUCH_AT.get(pid, 0.0) < 10.0:
+        return
+    _TOUCH_AT[pid] = now_ts
+    # 防字典无限增长：超 4096 项清空重建（玩家量级远小于此）
+    if len(_TOUCH_AT) > 4096:
+        _TOUCH_AT.clear()
+        _TOUCH_AT[pid] = now_ts
+    try:
+        db.touch_player(pid)
+    except Exception:
+        pass  # 活跃标记失败不影响游戏主流程
 @bp.route("/api/game/nickname", methods=["POST"])
 @common.api_wrap
 def api_nickname():
     """设置昵称（首次调用自动创建玩家并返回 token）。"""
     body: dict = request.get_json(silent=True) or {}
-    if not common.rate_check("ip:" + request.remote_addr):
+    if not common.rate_check("ip:" + common.client_ip()):
         return _err("请求太频繁，请稍后再试", 429)
     nickname: str = str(body.get("nickname", "")).strip()[:config.MAX_NICK_LEN]
     if not nickname:
@@ -129,7 +147,7 @@ def api_nickname():
 @common.api_wrap
 def api_lobby():
     """大厅信息：公开房间列表 + 在线人数（5 分钟内活跃）。"""
-    if not common.rate_check("ip:" + request.remote_addr):
+    if not common.rate_check("ip:" + common.client_ip()):
         return _err("请求太频繁", 429)
     rooms = [
         {
@@ -255,30 +273,33 @@ def api_state():
     """
     核心轮询端点：版本没变只返回 {"changed": false} 轻响应（省 CPU / 流量）。
     参数：room=房间码, token=玩家凭证（可空=观战）, v=客户端已知版本, chat=已知聊天 id
+    热路径优化：首查合并为一次连接；活跃标记 10 秒节流；模拟推进由
+    logic 层进程内缓存承担（落库节流 0.9s），版本比对用已落库版本。
     """
     code: str = request.args.get("room", "").strip().upper()
     token: str = request.args.get("token", "") or ""
-    player = _get_player(token)
-    rate_key: str = f"p:{int(player['id'])}" if player is not None else "ip:" + request.remote_addr
+    # bot 令牌一律视为匿名（与原 _get_player 语义一致）
+    safe_token: str = "" if token.startswith("bot-") else token
+    player, room, is_member = db.state_poll_prefetch(code, safe_token)
+
+    rate_key: str = f"p:{int(player['id'])}" if player is not None else "ip:" + common.client_ip()
     if not common.rate_check(rate_key):
         return _err("请求太频繁", 429)
-    room = db.get_room_by_code(code)
     if room is None:
         return _err("房间不存在", 404)
     room_id: int = int(room["id"])
 
-    is_member: bool = False
     if player is not None:
-        is_member = db.find_player_seat(room_id, int(player["id"])) is not None
-        db.touch_player(int(player["id"]))
+        _touch_throttled(int(player["id"]))
 
     # 任何请求都会驱动惰性结算（游戏公平推进的关键）
     state, version = logic.advance_and_save(room_id)
 
     client_v: int = int(request.args.get("v", "0") or 0)
+    chat_since: int = int(request.args.get("chat", "0") or 0)
     force_full: bool = room["status"] == "waiting"
     if client_v == version and not force_full:
-        chat_rows = db.get_chat_since(room_id, int(request.args.get("chat", "0") or 0))
+        chat_rows = db.get_chat_since(room_id, chat_since)
         return jsonify({
             "changed": False, "version": version, "server_ts": time.time(),
             "chat": [{"id": int(c["id"]), "nickname": c["nickname"] or "??",
@@ -286,7 +307,7 @@ def api_state():
         })
 
     view = entities.state_public_view(state, room_id, version)
-    members = db.get_room_players(room_id)
+    members, chat_rows = db.state_poll_extras(room_id, chat_since)
     view["room"] = {
         "code": code,
         "status": room["status"],
@@ -305,7 +326,6 @@ def api_state():
         for m in members
     ]
     view["is_member"] = is_member
-    chat_rows = db.get_chat_since(room_id, int(request.args.get("chat", "0") or 0))
     view["chat"] = [{"id": int(c["id"]), "nickname": c["nickname"] or "??",
                      "text": c["text"]} for c in chat_rows]
     view["changed"] = True

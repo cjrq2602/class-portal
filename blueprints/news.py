@@ -104,7 +104,7 @@ def api_admin_news_sync():
     portal_db.add_audit(auth_bp.current_user_id(), "news_sync", "",
                         f"added={res.get('added', 0)} digests={res.get('digests_added', 0)}"
                         f" error={res.get('error', '')}"[:150],
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({
         "added": int(res.get("added") or 0),
         "digests_added": int(res.get("digests_added") or 0),

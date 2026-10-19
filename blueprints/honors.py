@@ -116,7 +116,7 @@ def api_create():
     hid: int = portal_db.honor_create(title, owner, hdate, description, image_rel,
                                       auth_bp.current_user_id())
     portal_db.add_audit(auth_bp.current_user_id(), "honor_create", title,
-                        f"id={hid} img={bool(image_rel)}", request.remote_addr or "")
+                        f"id={hid} img={bool(image_rel)}", common.client_ip())
     return common.ok({"id": hid})
 
 
@@ -139,7 +139,7 @@ def api_update():
                            str(body.get("hdate", "")).strip()[:10],
                            str(body.get("description", "")).strip()[:500])
     portal_db.add_audit(auth_bp.current_user_id(), "honor_update", str(hid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -158,7 +158,7 @@ def api_pin():
     pinned: bool = portal_db.honor_toggle_pin(hid)
     portal_db.add_audit(auth_bp.current_user_id(),
                         "honor_pin" if pinned else "honor_unpin", str(hid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"is_pinned": pinned})
 
 
@@ -180,7 +180,7 @@ def api_delete():
         freed = uploads.delete_file(str(row["image_path"]))
     portal_db.honor_delete(hid)
     portal_db.add_audit(auth_bp.current_user_id(), "honor_delete", str(hid),
-                        f"freed={freed}", request.remote_addr or "")
+                        f"freed={freed}", common.client_ip())
     return common.ok({"freed_text": uploads.human_size(freed)})
 
 

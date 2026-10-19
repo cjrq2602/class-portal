@@ -172,7 +172,7 @@ def api_my_reads():
 # ============================================================
 def _audit(action: str, target: str = "", detail: str = "") -> None:
     portal_db.add_audit(auth_bp.current_user_id(), action, target, detail,
-                        request.remote_addr or "")
+                        common.client_ip())
 
 
 def _validate_payload(body: dict) -> tuple[str, str, str, str, bool]:

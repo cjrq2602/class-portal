@@ -112,7 +112,7 @@ def logout():
     uid = current_user_id()
     session.clear()
     if uid:
-        portal_db.add_audit(uid, "logout", "", "", request.remote_addr or "")
+        portal_db.add_audit(uid, "logout", "", "", common.client_ip())
     return common.ok()
 
 
@@ -128,7 +128,7 @@ def api_register():
     返回：{ok, user:{id,username,nickname,role_name}}
     权限：匿名（需有效邀请码）
     """
-    if not common.rate_check("ip:" + request.remote_addr, limit=3):
+    if not common.rate_check("ip:" + common.client_ip(), limit=3):
         return common.err("请求太频繁，请稍后再试", "rate", 429)
     body: dict = request.get_json(silent=True) or {}
     invite_code: str = str(body.get("invite_code", "")).strip().upper()
@@ -168,7 +168,7 @@ def api_register():
                                      common.hash_password(password), int(member["id"]))
     portal_db.consume_invite(int(invite["id"]))
     portal_db.add_audit(uid, "register", username,
-                        f"invite={invite_code}", request.remote_addr or "")
+                        f"invite={invite_code}", common.client_ip())
     _login_session(uid)  # 注册成功自动登录
     return common.ok({"user": {"id": uid, "username": username,
                                 "nickname": nickname, "role_name": "member"}})
@@ -182,7 +182,7 @@ def api_login():
     返回：{ok, user:{id,username,nickname,role_name,perms}}
     权限：匿名；连续失败 5 次锁 10 分钟。
     """
-    if not common.rate_check("ip:" + request.remote_addr, limit=5):
+    if not common.rate_check("ip:" + common.client_ip(), limit=5):
         return common.err("请求太频繁，请稍后再试", "rate", 429)
     body: dict = request.get_json(silent=True) or {}
     username: str = str(body.get("username", "")).strip().lower()
@@ -194,7 +194,7 @@ def api_login():
         return common.err("失败次数过多，账号已锁定 10 分钟", "locked", 423)
 
     user = portal_db.get_user_by_username(username)
-    ip: str = request.remote_addr or ""
+    ip: str = common.client_ip()
     ua: str = request.headers.get("User-Agent", "")
     if user is None or not common.verify_password(password, str(user["password_hash"])):
         common.login_fail(username)
@@ -275,7 +275,7 @@ def api_change_password():
     portal_db.bump_password_changed_at(uid)
     session["born_at"] = time.time()
     portal_db.add_audit(uid, "change_password", user["username"], "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -299,7 +299,7 @@ def api_reset_by_code():
             → 码归属该用户（码本就按 target_user_id 索引取，天然归属校验）
     通过：改密 + 码标已用 + password_changed_at 刷新（全部旧会话强制失效）+ 审计。
     """
-    if not common.rate_check_window("rc:" + (request.remote_addr or ""),
+    if not common.rate_check_window("rc:" + (common.client_ip()),
                                     limit=10, window_seconds=60.0):
         return common.err("请求太频繁，请稍后再试", "rate", 429)
     body: dict = request.get_json(silent=True) or {}
@@ -326,7 +326,7 @@ def api_reset_by_code():
     if not common.verify_reset_code(code, str(active["code_hash"])):
         common.reset_fail(uid)  # 仅哈希不匹配计入防爆破
         portal_db.add_audit(uid, "reset_code_fail", username, "",
-                            request.remote_addr or "")
+                            common.client_ip())
         left: int = common.RESET_MAX_FAILS
         return common.err(f"重置码不正确（连续输错 {left} 次将锁定 10 分钟）",
                           "code_mismatch", 401)
@@ -341,7 +341,7 @@ def api_reset_by_code():
     common.reset_fail_clear(uid)
     # 审计：谁（目标用户）于何时使用了码（生成侧审计在 resetcode.py）
     portal_db.add_audit(uid, "reset_code_use", username,
-                        f"code_id={int(active['id'])}", request.remote_addr or "")
+                        f"code_id={int(active['id'])}", common.client_ip())
     return common.ok()
 
 
@@ -367,5 +367,5 @@ def api_update_nickname():
         return common.err("用户不存在", "auth", 401)
     portal_db.set_nickname(uid, nickname)
     portal_db.add_audit(uid, "update_nickname", str(user["nickname"]),
-                        f"-> {nickname}", request.remote_addr or "")
+                        f"-> {nickname}", common.client_ip())
     return common.ok({"nickname": nickname})

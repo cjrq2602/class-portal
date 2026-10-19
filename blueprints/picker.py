@@ -107,7 +107,7 @@ def api_draw():
 
     picked = random.choice(candidates)          # 服务端随机，防前端可预测
     portal_db.add_audit(uid, "picker_draw", str(picked["name"]), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({
         "picked": {"id": int(picked["id"]), "name": str(picked["name"]),
                    "seat_no": int(picked["seat_no"])},
@@ -147,7 +147,7 @@ def api_admin_roster_add():
     if not portal_db.member_add(name, seat):
         return common.err("该姓名已存在（名单自动去重）")
     portal_db.add_audit(auth_bp.current_user_id(), "roster_add", name, "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -170,7 +170,7 @@ def api_admin_roster_update():
         seat = 0
     portal_db.member_update(mid, name, seat, bool(body.get("is_active", True)))
     portal_db.add_audit(auth_bp.current_user_id(), "roster_update", str(mid), name,
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -186,7 +186,7 @@ def api_admin_roster_delete():
         return common.err("id 不合法")
     portal_db.member_delete(mid)
     portal_db.add_audit(auth_bp.current_user_id(), "roster_delete", str(mid), "",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok()
 
 
@@ -201,5 +201,5 @@ def api_admin_roster_import():
     added: int = portal_db.member_import_from_users()
     total: int = portal_db.member_count()
     portal_db.add_audit(auth_bp.current_user_id(), "roster_import_users", "users",
-                        f"added={added} total={total}", request.remote_addr or "")
+                        f"added={added} total={total}", common.client_ip())
     return common.ok({"added": added, "total": total})

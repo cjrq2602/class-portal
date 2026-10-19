@@ -86,5 +86,5 @@ def api_links_submit():
             return common.err("分类不存在")
     sub_id: int = portal_db.link_sub_add(name, url, category_id, description, uid)
     portal_db.add_audit(uid, "link_submit", name, url[:80],
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"id": sub_id, "msg": "已提交，审核通过后展示"})

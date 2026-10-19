@@ -183,6 +183,18 @@ def today_digest_ready_at() -> str:
 _rate_store: dict[str, deque] = defaultdict(deque)
 
 
+def client_ip() -> str:
+    """
+    取真实访客 IP：PythonAnywhere 反向代理后 remote_addr 是 LB 内网地址
+    （全站所有访客共享同一个），必须读 X-Forwarded-For 首跳。
+    限流/审计都应使用本函数，否则全班共用同一个限流桶会集体 429。
+    """
+    xff: str = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
 def rate_check(key: str, limit: int = RATE_LIMIT_PER_SEC) -> bool:
     """每 key 每秒最多 limit 次。返回是否放行。"""
     q = _rate_store[key]

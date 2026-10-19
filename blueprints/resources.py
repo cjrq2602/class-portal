@@ -124,7 +124,7 @@ def api_upload():
         rid: int = portal_db.res_create(title, subject, "link", link, "",
                                         "", 0, uid)
         portal_db.add_audit(uid, "resource_upload", title, "type=link",
-                            request.remote_addr or "")
+                            common.client_ip())
         return common.ok({"id": rid})
 
     # ---- 文件模式 ----
@@ -148,7 +148,7 @@ def api_upload():
     rid = portal_db.res_create(title, subject, "file", "", rel,
                                uploads.safe_display_name(f.filename), size, uid)
     portal_db.add_audit(uid, "resource_upload", title,
-                        f"type=file size={size}", request.remote_addr or "")
+                        f"type=file size={size}", common.client_ip())
     return common.ok({"id": rid, "size_text": uploads.human_size(size)})
 
 
@@ -176,7 +176,7 @@ def api_delete():
     freed: int = uploads.delete_file(str(row["file_path"])) if row["file_path"] else 0
     portal_db.res_delete(rid)
     portal_db.add_audit(uid, "resource_delete", str(rid), f"freed={freed}",
-                        request.remote_addr or "")
+                        common.client_ip())
     return common.ok({"freed": freed, "freed_text": uploads.human_size(freed)})
 
 
@@ -294,5 +294,5 @@ def api_admin_subjects_set():
         return common.err("至少保留一个学科标签")
     portal_db.setting_put(SUBJECTS_KEY, json.dumps(clean[:30], ensure_ascii=False))
     portal_db.add_audit(auth_bp.current_user_id(), "resource_subjects_set",
-                        ",".join(clean), "", request.remote_addr or "")
+                        ",".join(clean), "", common.client_ip())
     return common.ok({"subjects": clean})

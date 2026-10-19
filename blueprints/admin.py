@@ -34,7 +34,7 @@ def _admin_rate_limit():
     if not request.path.startswith("/api/admin"):
         return None
     uid = auth_bp.current_user_id()
-    key: str = f"admin:{uid if uid else request.remote_addr}"
+    key: str = f"admin:{uid if uid else common.client_ip()}"
     if not common.rate_check_window(key, limit=20, window_seconds=1.0):
         return common.err("请求太频繁，请稍后再试", "rate", 429)
     return None
@@ -75,7 +75,7 @@ def _is_root_or_full(uid: int) -> bool:
 def _audit(action: str, target: str = "", detail: str = "") -> None:
     """管理员写操作留痕（user_id 取当前会话）。"""
     portal_db.add_audit(auth_bp.current_user_id(), action, target, detail,
-                        request.remote_addr or "")
+                        common.client_ip())
 
 
 def _gen_invite_code(length: int = 8) -> str:

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% set active_page = "disclaimer" %}
+{% block title %}安全与免责声明 · 守夜广场{% endblock %}
+
+{% block content %}
+<div class="page-head mt-16">
+    <div>
+        <h1 class="page-head__title">🛡️ 安全与免责声明</h1>
+        <p class="page-head__sub">使用本站前请花一分钟读完这一页</p>
+    </div>
+</div>
+
+<div class="card mt-16" style="padding:var(--sp-24); line-height:2">
+    <h2 style="font-size:var(--fs-16); margin-bottom:8px">一、网站性质</h2>
+    <p class="text-muted">
+        本站（守夜广场）是由同学个人出于<b>编程学习目的</b>开发并维护的练手项目，
+        仅供本班同学内部交流使用，<b>不代表任何学校、机构或公司，不用于任何商业用途</b>。
+        站内所有功能（新闻、作业、考勤、游戏等）均为学习成果，可能存在缺陷，
+        维护者不保证服务持续、稳定、无错误。
+    </p>
+
+    <h2 style="font-size:var(--fs-16); margin:20px 0 8px">二、账号与数据安全</h2>
+    <ul class="text-muted" style="padding-left:1.4em; list-style:disc">
+        <li>密码经<b>加盐哈希加密</b>存储，包括管理员在内的任何人都无法查看明文密码；
+            仍建议<b>不要</b>在站内使用与微信、邮箱等重要账号相同的密码。</li>
+        <li>考勤功能仅在签到瞬间调用浏览器定位，用于计算与考勤点的距离并留档备查；
+            本站<b>不会持续追踪</b>任何人的位置。</li>
+        <li>请妥善保管账号，不要转借他人；怀疑账号被盗时请及时联系管理员重置密码。</li>
+        <li>请勿在站内填写与班级事务无关的个人敏感信息（身份证号、银行卡号等）。</li>
+    </ul>
+
+    <h2 style="font-size:var(--fs-16); margin:20px 0 8px">三、内容责任</h2>
+    <p class="text-muted">
+        站内文字、图片等内容由用户自行发布，仅代表作者本人观点，与网站维护者无关。
+        禁止发布违法违规、侵犯他人权益、人身攻击、泄露他人隐私的内容；
+        违规内容管理员有权删除，并视情节封禁账号。
+    </p>
+
+    <h2 style="font-size:var(--fs-16); margin:20px 0 8px">四、免责声明</h2>
+    <p class="text-muted">
+        本站按“现状”提供。在法律允许的最大范围内，维护者不对因使用或无法使用本站
+        而产生的任何直接或间接损失承担责任。站内如引用第三方新闻、图片等素材，
+        仅作学习展示之用，版权归原作者或机构所有。
+    </p>
+
+    <h2 style="font-size:var(--fs-16); margin:20px 0 8px">五、权益联系</h2>
+    <p class="text-muted">
+        如站内内容侵犯您的合法权益，或您希望更正、删除自己的个人信息，
+        请联系班级管理员，核实后会尽快处理。
+    </p>
+
+    <p class="text-faint mt-24" style="font-size:var(--fs-12)">
+        本声明自发布之日起生效。维护者保留随时更新本声明的权利，更新后将在站内公示。
+        最后更新：2026 年 10 月 22 日
+    </p>
+</div>
+{% endblock %}

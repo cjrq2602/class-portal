@@ -261,6 +261,12 @@ def index():
     )
 
 
+@bp.route("/disclaimer")
+def disclaimer_page():
+    """安全与免责声明：公开展示（游客可读），入口在登录页与设置·关于。"""
+    return render_template("disclaimer.html")
+
+
 @bp.route("/me")
 def me_page():
     """

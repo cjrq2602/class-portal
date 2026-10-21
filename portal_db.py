@@ -2392,3 +2392,210 @@ def att_my_records(user_id: int, limit: int = 20) -> list[sqlite3.Row]:
             "SELECT r.*, s.title FROM attendance_records r"
             " JOIN attendance_sessions s ON s.id=r.session_id"
             " WHERE r.user_id=? ORDER BY r.id DESC LIMIT ?", (user_id, limit)).fetchall()
+
+
+# ============================================================
+# 时政模块（第八期）：时政新闻 / 时政解读 / 时政词典
+# ============================================================
+# 与新闻模块同构：Worker 抓取写 politics/YYYY-MM-DD.json，
+# 站点 news_sync.sync_politics() 读回入库；解读沿用 digest_engine。
+POLITICS_SCHEMA: str = """
+-- 时政新闻（与 news_items 同构，独立表避免互相污染统计）
+CREATE TABLE IF NOT EXISTS politics_items (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    source       TEXT NOT NULL,            -- 来源名（中新网即时/中新网要闻/BBC中文/FT中文网）
+    title        TEXT NOT NULL,
+    url          TEXT NOT NULL,
+    summary      TEXT NOT NULL DEFAULT '',
+    published_at REAL NOT NULL,            -- 发布时间 Unix 秒（UTC）
+    pub_bj_date  TEXT NOT NULL,            -- 北京日期 YYYY-MM-DD
+    created_at   REAL NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_politics_source_url ON politics_items(source, url);
+CREATE INDEX IF NOT EXISTS idx_politics_pub ON politics_items(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_politics_bjdate ON politics_items(pub_bj_date);
+
+-- 时政解读（与 news_digests 同构，type+date 唯一 → 幂等）
+CREATE TABLE IF NOT EXISTS politics_digests (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    ntype      TEXT NOT NULL,              -- today | yesterday
+    ndate      TEXT NOT NULL,
+    generator  TEXT NOT NULL DEFAULT 'lazy',
+    edited     INTEGER NOT NULL DEFAULT 0,
+    payload    TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_politics_digest ON politics_digests(ntype, ndate);
+CREATE INDEX IF NOT EXISTS idx_politics_digest_date ON politics_digests(ndate DESC);
+
+-- 时政词典（词条 + 政治表述解释；种子数据由 migrate_politics.py 写入，幂等）
+CREATE TABLE IF NOT EXISTS politics_terms (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    term       TEXT NOT NULL,              -- 词条名（如"新质生产力"）
+    category   TEXT NOT NULL,              -- 思想理论 | 政治表述 | 机构与会议 | 政策与战略 | 经济治理 | 国际与外交
+    definition TEXT NOT NULL,              -- 释义
+    example    TEXT NOT NULL DEFAULT '',   -- 例句 / 出处说明
+    sort       INTEGER NOT NULL DEFAULT 0, -- 同类内排序（小在前）
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_politics_term ON politics_terms(term);
+CREATE INDEX IF NOT EXISTS idx_politics_term_cat ON politics_terms(category, sort);
+"""
+
+
+def init_politics_db() -> None:
+    """建时政三表（幂等，可反复执行）。"""
+    with db.get_db() as conn:
+        conn.executescript(POLITICS_SCHEMA)
+
+
+# ---------------- 时政新闻 ----------------
+def insert_politics_many(items: list[dict[str, Any]]) -> int:
+    """批量写入时政新闻（source+url 唯一去重，幂等）。返回新增条数。"""
+    if not items:
+        return 0
+    ts: float = time.time()
+    added: int = 0
+    with db.get_db() as conn:
+        for it in items:
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO politics_items"
+                "(source, title, url, summary, published_at, pub_bj_date, created_at)"
+                " VALUES (?,?,?,?,?,?,?)",
+                (str(it["source"]), str(it["title"]), str(it["url"]),
+                 str(it.get("summary", ""))[:400], float(it["published_at"]),
+                 str(it["pub_bj_date"]), ts),
+            )
+            added += cur.rowcount
+    return added
+
+
+def list_politics(page: int = 1, per_page: int = 30,
+                  source: Optional[str] = None) -> tuple[list[sqlite3.Row], int]:
+    """分页查询时政新闻（时间倒序），可按来源筛选。"""
+    where: str = ""
+    args: list[Any] = []
+    if source:
+        where = " WHERE source=?"
+        args.append(source)
+    offset: int = max(0, (page - 1) * per_page)
+    with db.get_db() as conn:
+        total: int = int(conn.execute(
+            f"SELECT COUNT(*) FROM politics_items{where}", args).fetchone()[0])
+        rows = conn.execute(
+            f"SELECT * FROM politics_items{where} ORDER BY published_at DESC, id DESC"
+            f" LIMIT ? OFFSET ?", args + [per_page, offset]).fetchall()
+    return rows, total
+
+
+def politics_sources() -> list[tuple[str, int]]:
+    """时政来源及条数。"""
+    with db.get_db() as conn:
+        rows = conn.execute(
+            "SELECT source, COUNT(*) AS c FROM politics_items GROUP BY source"
+            " ORDER BY c DESC").fetchall()
+    return [(str(r["source"]), int(r["c"])) for r in rows]
+
+
+def politics_in_window(start_ts: float, end_ts: float) -> list[sqlite3.Row]:
+    """窗口内时政新闻（解读生成用）。"""
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT * FROM politics_items WHERE published_at >= ? AND published_at < ?"
+            " ORDER BY published_at DESC",
+            (float(start_ts), float(end_ts))).fetchall()
+
+
+def count_politics() -> int:
+    with db.get_db() as conn:
+        return int(conn.execute("SELECT COUNT(*) FROM politics_items").fetchone()[0])
+
+
+# ---------------- 时政解读 ----------------
+def get_politics_digest(ntype: str, ndate: str) -> Optional[sqlite3.Row]:
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT * FROM politics_digests WHERE ntype=? AND ndate=?",
+            (ntype, ndate)).fetchone()
+
+
+def upsert_politics_digest(ntype: str, ndate: str, payload: str,
+                           generator: str = "lazy") -> None:
+    """写入/覆盖时政解读（(type,date) 唯一，幂等）。"""
+    ts: float = time.time()
+    with db.get_db() as conn:
+        conn.execute(
+            "INSERT INTO politics_digests(ntype, ndate, generator, edited, payload,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?,?)"
+            " ON CONFLICT(ntype, ndate) DO UPDATE SET"
+            " generator=excluded.generator, payload=excluded.payload,"
+            " updated_at=excluded.updated_at",
+            (ntype, ndate, generator, 0, payload, ts, ts),
+        )
+
+
+# ---------------- 时政词典 ----------------
+def politics_term_upsert(term: str, category: str, definition: str,
+                         example: str = "", sort: int = 0) -> None:
+    """种子/更新词条（term 唯一 → 重跑只更新释义，不重复建行）。"""
+    ts: float = time.time()
+    with db.get_db() as conn:
+        conn.execute(
+            "INSERT INTO politics_terms(term, category, definition, example, sort,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?,?)"
+            " ON CONFLICT(term) DO UPDATE SET"
+            " category=excluded.category, definition=excluded.definition,"
+            " example=excluded.example, sort=excluded.sort,"
+            " updated_at=excluded.updated_at",
+            (term, category, definition, example, sort, ts, ts),
+        )
+
+
+def politics_terms_search(q: str = "", category: str = "",
+                          limit: int = 200) -> list[sqlite3.Row]:
+    """
+    词典搜索：q 命中词条名或释义（LIKE 包含），可按分类过滤；
+    无 q 无分类时按 sort 返回全部（词典页初始态）。
+    """
+    where: list[str] = []
+    args: list[Any] = []
+    if q:
+        where.append("(term LIKE ? OR definition LIKE ?)")
+        like: str = f"%{q}%"
+        args += [like, like]
+    if category:
+        where.append("category=?")
+        args.append(category)
+    sql: str = ("SELECT * FROM politics_terms"
+                + (" WHERE " + " AND ".join(where) if where else "")
+                + " ORDER BY CASE WHEN term LIKE ? THEN 0 ELSE 1 END, category, sort, id"
+                + " LIMIT ?")
+    # 词条名以 q 开头的排最前（无 q 时恒 1，不影响默认排序）
+    args = ([f"{q}%"] if q else ["%"]) + args + [limit]
+    with db.get_db() as conn:
+        return conn.execute(sql, args).fetchall()
+
+
+def politics_terms_names() -> list[str]:
+    """全部词条名（前端做新闻标题高亮用，按长度倒序避免短词抢先截断）。"""
+    with db.get_db() as conn:
+        rows = conn.execute("SELECT term FROM politics_terms").fetchall()
+    names: list[str] = [str(r["term"]) for r in rows]
+    names.sort(key=len, reverse=True)
+    return names
+
+
+def politics_terms_categories() -> list[tuple[str, int]]:
+    """分类及词条数（词典页分类 chips）。"""
+    with db.get_db() as conn:
+        rows = conn.execute(
+            "SELECT category, COUNT(*) AS c FROM politics_terms"
+            " GROUP BY category ORDER BY MIN(sort)").fetchall()
+    return [(str(r["category"]), int(r["c"])) for r in rows]
+
+
+def count_politics_terms() -> int:
+    with db.get_db() as conn:
+        return int(conn.execute("SELECT COUNT(*) FROM politics_terms").fetchone()[0])

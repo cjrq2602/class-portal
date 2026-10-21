@@ -135,35 +135,56 @@ def _digest_files(names: list[str]) -> list[str]:
 
 
 # ============================================================
-# 同步主流程
+# 同步主流程（新闻 / 时政共用，目录与入库函数按配置注入）
 # ============================================================
-def _do_sync(force: bool = False) -> dict[str, Any]:
+# 新闻用历史遗留的无前缀 sync_state 键（last_sha 等），时政用 "politics_" 前缀，
+# 两条链路互不影响，也保留新闻侧既有状态。
+_NEWS_CFG: dict[str, Any] = {
+    "news_dir": "news", "digest_dir": "digests", "prefix": "",
+    "insert": portal_db.insert_news_many,
+    "get_digest": portal_db.get_digest,
+    "upsert_digest": portal_db.upsert_digest,
+    "count": portal_db.count_news,
+}
+_POLITICS_CFG: dict[str, Any] = {
+    "news_dir": "politics", "digest_dir": "politics_digests", "prefix": "politics_",
+    "insert": portal_db.insert_politics_many,
+    "get_digest": portal_db.get_politics_digest,
+    "upsert_digest": portal_db.upsert_politics_digest,
+    "count": portal_db.count_politics,
+}
+
+
+def _do_sync(force: bool = False, cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """
     实际执行同步（调用方保证已持锁）。
     返回 {ok, changed, added, digests_added, sha, error}
     """
+    if cfg is None:
+        cfg = _NEWS_CFG
+    p: str = str(cfg["prefix"])
     result: dict[str, Any] = {"ok": False, "changed": False, "added": 0,
                               "digests_added": 0, "sha": "", "error": ""}
     now: float = time.time()
-    last_sha: str = portal_db.sync_state_get("last_sha", "")
+    last_sha: str = portal_db.sync_state_get(p + "last_sha", "")
     try:
         # ---- 1. 新闻目录 SHA 比对（省限速额度） ----
-        sha: Optional[str] = _repo_sha("news")
+        sha: Optional[str] = _repo_sha(str(cfg["news_dir"]))
         result["sha"] = sha or ""
         if sha and sha == last_sha and not force:
             result["ok"] = True
-            portal_db.sync_state_put("last_sync_at", str(now))
-            portal_db.sync_state_put("last_ok", "1")
-            portal_db.sync_state_put("last_error", "")
+            portal_db.sync_state_put(p + "last_sync_at", str(now))
+            portal_db.sync_state_put(p + "last_ok", "1")
+            portal_db.sync_state_put(p + "last_error", "")
             return result
 
         # ---- 2. 新闻文件 → 入库 ----
         if sha:
-            names: list[str] = _list_dir("news", sha)
+            names: list[str] = _list_dir(str(cfg["news_dir"]), sha)
             added: int = 0
             for name in _day_files(names):
                 try:
-                    payload = json.loads(_raw(f"news/{name}", sha))
+                    payload = json.loads(_raw(f"{cfg['news_dir']}/{name}", sha))
                 except Exception:  # noqa: BLE001 单个文件坏不影响整体
                     continue
                 items: list[dict[str, Any]] = []
@@ -180,52 +201,50 @@ def _do_sync(force: bool = False) -> dict[str, Any]:
                     except Exception:  # noqa: BLE001
                         continue
                 items = [x for x in items if x["source"] and x["title"] and x["url"]]
-                added += portal_db.insert_news_many(items)
+                added += int(cfg["insert"](items))
             result["added"] = added
 
             # ---- 3. 总结文件 → 入库（管理员手改过的 edited=1 不覆盖） ----
-            d_names: list[str] = _list_dir("digests", sha)
+            d_names: list[str] = _list_dir(str(cfg["digest_dir"]), sha)
             d_added: int = 0
             for name in _digest_files(d_names):
                 try:
-                    payload = json.loads(_raw(f"digests/{name}", sha))
+                    payload = json.loads(_raw(f"{cfg['digest_dir']}/{name}", sha))
                 except Exception:  # noqa: BLE001
                     continue
                 ntype: str = str(payload.get("type") or "")
                 ndate: str = str(payload.get("date") or "")
                 if ntype not in ("today", "yesterday") or not ndate:
                     continue
-                exist = portal_db.get_digest(ntype, ndate)
+                exist = cfg["get_digest"](ntype, ndate)
                 if exist is not None and int(exist["edited"]) == 1:
                     continue  # 管理员手工编辑过 → 保留人工内容
-                portal_db.upsert_digest(ntype, ndate,
-                                        json.dumps(payload, ensure_ascii=False),
-                                        generator=str(payload.get("generator") or "action"))
+                cfg["upsert_digest"](ntype, ndate,
+                                     json.dumps(payload, ensure_ascii=False),
+                                     generator=str(payload.get("generator") or "action"))
                 d_added += 1
             result["digests_added"] = d_added
             result["changed"] = bool(added or d_added)
-            portal_db.sync_state_put("last_sha", sha)
+            portal_db.sync_state_put(p + "last_sha", sha)
 
         # ---- 4. 成功记账 ----
-        portal_db.sync_state_put("last_sync_at", str(now))
-        portal_db.sync_state_put("last_ok", "1")
-        portal_db.sync_state_put("last_error", "")
+        portal_db.sync_state_put(p + "last_sync_at", str(now))
+        portal_db.sync_state_put(p + "last_ok", "1")
+        portal_db.sync_state_put(p + "last_error", "")
         result["ok"] = True
     except Exception as exc:  # noqa: BLE001 —— 网络/解析失败一律降级
         result["error"] = f"{type(exc).__name__}: {exc}"[:200]
-        portal_db.sync_state_put("last_sync_at", str(now))  # 仍记账，防限速风暴
-        portal_db.sync_state_put("last_ok", "0")
-        portal_db.sync_state_put("last_error", result["error"])
+        portal_db.sync_state_put(p + "last_sync_at", str(now))  # 仍记账，防限速风暴
+        portal_db.sync_state_put(p + "last_ok", "0")
+        portal_db.sync_state_put(p + "last_error", result["error"])
     return result
 
 
-def sync_news(force: bool = False) -> dict[str, Any]:
-    """
-    对外入口：TTL 内直接返回缓存状态；过期则（尝试）同步。
-    force=True 用于后台"手动同步"按钮（忽略 TTL，但仍受锁保护）。
-    """
+def _sync_entry(cfg: dict[str, Any], force: bool) -> dict[str, Any]:
+    """TTL / 进程锁公共入口（新闻与时政共用一把锁，串行省额度）。"""
     now: float = time.time()
-    last_at: float = float(portal_db.sync_state_get("last_sync_at", "0") or 0)
+    p: str = str(cfg["prefix"])
+    last_at: float = float(portal_db.sync_state_get(p + "last_sync_at", "0") or 0)
     if not force and last_at and (now - last_at) < NEWS_TTL_SECONDS:
         return {"ok": True, "skipped": True, "reason": "ttl",
                 "last_sync_at": last_at}
@@ -234,7 +253,7 @@ def sync_news(force: bool = False) -> dict[str, Any]:
         return {"ok": True, "skipped": True, "reason": "locked",
                 "last_sync_at": last_at}
     try:
-        res = _do_sync(force=force)
+        res = _do_sync(force=force, cfg=cfg)
         res["skipped"] = False
         res["last_sync_at"] = time.time()
         return res
@@ -242,12 +261,39 @@ def sync_news(force: bool = False) -> dict[str, Any]:
         _SYNC_LOCK.release()
 
 
+def sync_news(force: bool = False) -> dict[str, Any]:
+    """
+    对外入口：TTL 内直接返回缓存状态；过期则（尝试）同步。
+    force=True 用于后台"手动同步"按钮（忽略 TTL，但仍受锁保护）。
+    """
+    return _sync_entry(_NEWS_CFG, force)
+
+
+def sync_politics(force: bool = False) -> dict[str, Any]:
+    """时政同步入口（与 sync_news 同策略；目录 politics/ + politics_digests/）。"""
+    return _sync_entry(_POLITICS_CFG, force)
+
+
 # ============================================================
 # 展示用状态（页面标注"数据更新于 xx:xx"）
 # ============================================================
+def _status(cfg: dict[str, Any]) -> dict[str, Any]:
+    st: dict[str, str] = portal_db.sync_state_all()
+    p: str = str(cfg["prefix"])
+    return {
+        "last_sync_at": float(st.get(p + "last_sync_at", "0") or 0),
+        "ok": st.get(p + "last_ok", "") == "1",
+        "error": st.get(p + "last_error", ""),
+        "item_count": int(cfg["count"]()),
+        "ttl": NEWS_TTL_SECONDS,
+        "repo": NEWS_REPO,
+        "branch": NEWS_BRANCH,
+    }
+
+
 def sync_status() -> dict[str, Any]:
     """
-    返回同步状态（供新闻页/后台展示）：
+    返回新闻同步状态（供新闻页/后台展示）：
       last_sync_at  上次同步时间（Unix 秒，UTC；前端按北京时间格式化）
       ok            上次是否成功
       error         上次失败原因
@@ -255,13 +301,9 @@ def sync_status() -> dict[str, Any]:
       ttl           缓存 TTL（秒）
       repo          当前配置的仓库名（后台可见，便于发现配置错）
     """
-    st: dict[str, str] = portal_db.sync_state_all()
-    return {
-        "last_sync_at": float(st.get("last_sync_at", "0") or 0),
-        "ok": st.get("last_ok", "") == "1",
-        "error": st.get("last_error", ""),
-        "item_count": portal_db.count_news(),
-        "ttl": NEWS_TTL_SECONDS,
-        "repo": NEWS_REPO,
-        "branch": NEWS_BRANCH,
-    }
+    return _status(_NEWS_CFG)
+
+
+def politics_status() -> dict[str, Any]:
+    """时政同步状态（键带 politics_ 前缀，与新闻互不影响）。"""
+    return _status(_POLITICS_CFG)

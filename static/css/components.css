@@ -1383,3 +1383,66 @@ textarea.input { min-height: 88px; resize: vertical; }
 }
 
 /* 深色模式无需额外覆盖：以上容器统一使用 --bg-card，dark.css 已接管该变量 */
+
+
+/* ============================================================
+   时政学习页（/politics）
+   ============================================================ */
+/* 新闻标题/解读正文里的词条高亮：虚线下划线按钮，点开跳词典 */
+.pol-term {
+    display: inline;
+    padding: 0 1px;
+    border: none;
+    background: transparent;
+    color: var(--c-primary);
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+    border-bottom: 1px dashed var(--c-primary);
+    border-radius: 2px;
+    transition: background var(--dur-fast) var(--ease);
+}
+.pol-term:hover { background: var(--bg-hover); }
+
+/* 说明文字里的小样例 */
+.pol-term-demo {
+    color: var(--c-primary);
+    border-bottom: 1px dashed var(--c-primary);
+    padding: 0 1px;
+}
+
+/* 词典词条卡 */
+.pol-term-card {
+    padding: var(--sp-16);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-12);
+    background: var(--bg-card);
+    margin-bottom: 10px;
+    transition: border-color var(--dur-fast) var(--ease),
+                transform var(--dur-fast) var(--ease);
+}
+.pol-term-card:hover {
+    border-color: var(--c-primary);
+    transform: translateY(-1px);
+}
+.pol-term-card__head {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+.pol-term-card__name { font-size: var(--fs-16); }
+.pol-term-card__def {
+    font-size: var(--fs-14);
+    color: var(--text-2);
+    line-height: 1.9;
+}
+.pol-term-card__eg {
+    margin-top: 6px;
+    font-size: var(--fs-12);
+    color: var(--text-3);
+    line-height: 1.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pol-term-card, .pol-term { transition: none; }
+    .pol-term-card:hover { transform: none; }
+}

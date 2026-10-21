@@ -59,6 +59,8 @@ def _static_v() -> str:
         "static/js/attendance.js",
         # 第七期：皮肤包 + 语言切换
         "static/css/skins.css", "static/js/i18n.js",
+        # 第八期：时政学习（新闻/解读/词典）
+        "static/js/politics.js",
     ]
     h = hashlib.md5()
     for rel in files:
@@ -258,6 +260,7 @@ def create_app() -> Flask:
     from blueprints import main as main_bp
     from blueprints import news as news_bp
     from blueprints import picker as picker_bp
+    from blueprints import politics as politics_bp
     from blueprints import quote as quote_bp
     from blueprints import resetcode as resetcode_bp
     from blueprints import resources as resources_bp
@@ -278,6 +281,7 @@ def create_app() -> Flask:
     app.register_blueprint(quote_bp.bp)
     app.register_blueprint(checkin_bp.bp)
     app.register_blueprint(picker_bp.bp)
+    app.register_blueprint(politics_bp.bp)
     app.register_blueprint(links_bp.bp)
     app.register_blueprint(updates_bp.bp)
     app.register_blueprint(resetcode_bp.bp)
@@ -313,6 +317,7 @@ if __name__ == "__main__":
     portal_db.init_part6_db()   # 第 6 期新表（幂等；线上用 migrate_part6.py）
     portal_db.ensure_pwd_changed_column()  # 第 6 期 users 补列（幂等）
     portal_db.init_attendance_db()   # 考勤表（幂等；线上用 migrate_attendance.py）
+    portal_db.init_politics_db()     # 时政三表（幂等；线上用 migrate_politics.py）
     # 本地 http 开发：Secure cookie 会发不下去，这里关掉（线上 WSGI 不受影响）
     app.config["SESSION_COOKIE_SECURE"] = False
     # 监听所有网卡；debug=False 避免 reloader fork 子进程导致浏览器连接不稳定

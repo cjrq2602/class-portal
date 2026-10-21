@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% set active_page = "politics" %}
+{% block title %}时政学习 · 守夜广场{% endblock %}
+
+{% block content %}
+<!-- 分段标签：时政学习（本页） ⇄ 时事新闻 ⇄ 每日总结 -->
+<nav class="seg-tabs">
+    <a class="seg-tabs__item seg-tabs__item--active" href="/politics"
+       data-seg-icon="landmark">时政学习</a>
+    <a class="seg-tabs__item" href="/news" data-seg-icon="file-text">时事新闻</a>
+    <a class="seg-tabs__item" href="/digest" data-seg-icon="clock">每日总结</a>
+</nav>
+
+<!-- 页内三选项卡 -->
+<div class="chip-row mt-16" id="pol-tabs">
+    <button class="chip chip--active" data-tab="news">📰 时政新闻</button>
+    <button class="chip" data-tab="digest">📝 每日解读</button>
+    <button class="chip" data-tab="dict">📖 时政词典</button>
+</div>
+
+<!-- ================= 选项卡 1：时政新闻 ================= -->
+<section class="card mt-16" id="tab-news">
+    <div class="digest-card__head">
+        <h2>🏛️ 时政新闻</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)" id="pol-sync-note"></span>
+    </div>
+    <div class="chips" id="pol-source-chips"></div>
+    <div id="pol-list" class="stagger"></div>
+    <div class="mt-16 flex-between flex-wrap gap-12">
+        <span class="text-faint" style="font-size:var(--fs-12)" id="pol-total"></span>
+        <div id="pol-pager"></div>
+    </div>
+    <p class="text-faint mt-16" style="font-size:var(--fs-12);line-height:1.8">
+        数据来源：中新网即时 / 中新网要闻 / BBC中文 / FT中文网，经 GitHub Actions 每 20 分钟
+        抓取一次 → 本站缓存 5 分钟，<b>从源头发布到可见约需 20~25 分钟</b>；
+        抓取失败时自动降级展示旧数据。标题里出现的词典词条会以<span class="pol-term-demo">下划线</span>标出，点开可查释义。
+    </p>
+</section>
+
+<!-- ================= 选项卡 2：每日解读 ================= -->
+<section class="card mt-16" id="tab-digest" hidden>
+    <div class="digest-card__head">
+        <h2>📝 时政每日解读</h2>
+        <div class="chip-row" style="margin:0">
+            <button class="chip chip--active" data-dtype="today">今日</button>
+            <button class="chip" data-dtype="yesterday">昨日</button>
+        </div>
+    </div>
+    <div id="pol-digest-body"></div>
+    <p class="text-faint mt-16" style="font-size:var(--fs-12);line-height:1.8">
+        解读每天两份：【昨日解读】北京 0 点更新（覆盖前一天全天）、【今日解读】北京 9 点更新
+        （覆盖当天 0~9 点）。由规则引擎提炼要点与关键词，Worker 配了 AI 时会再做一轮润色。
+    </p>
+</section>
+
+<!-- ================= 选项卡 3：时政词典 ================= -->
+<section class="card mt-16" id="tab-dict" hidden>
+    <div class="digest-card__head">
+        <h2>📖 时政词典</h2>
+        <span class="text-faint" style="font-size:var(--fs-12)" id="dict-count"></span>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+        <input class="input" id="dict-q" type="search" maxlength="30"
+               placeholder="搜索词条或释义，如：新质生产力 / 两会 / 一带一路">
+    </div>
+    <div class="chips" id="dict-cat-chips"></div>
+    <div id="dict-list" class="stagger mt-12"></div>
+    <p class="text-faint mt-16" style="font-size:var(--fs-12);line-height:1.8">
+        收录时政新闻中常见的政策词汇与规范表述，释义仅供学习参考，
+        权威表述请以官方发布为准。
+    </p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/politics.js?v={{ static_v }}"></script>
+{% endblock %}

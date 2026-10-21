@@ -219,3 +219,93 @@ def summary_card(ntype: str) -> Optional[dict[str, Any]]:
         "keywords": (payload.get("keywords") or [])[:5],
         "preview": [p.get("text", "") for p in (payload.get("points") or [])[:3]],
     }
+
+
+# ============================================================
+# 时政解读（与新闻总结同一套规则引擎与时间逻辑；
+# 数据来自 politics_items / politics_digests，互不影响）
+# ============================================================
+def _load_politics_items(start_ts: float, end_ts: float) -> list[dict[str, Any]]:
+    """窗口内时政新闻 → 引擎结构（id 与 Worker 同一哈希算法）。"""
+    rows = portal_db.politics_in_window(start_ts, end_ts)
+    items: list[dict[str, Any]] = []
+    for r in rows:
+        source: str = str(r["source"])
+        url: str = str(r["url"])
+        items.append({
+            "id": digest_engine.news_id(source, url),
+            "title": str(r["title"]),
+            "source": source,
+            "url": url,
+            "summary": str(r["summary"] or ""),
+            "published_at": float(r["published_at"]),
+        })
+    return items
+
+
+def generate_politics_local(ntype: str, ndate: str, start_ts: float, end_ts: float,
+                            generator: str = "lazy") -> dict[str, Any]:
+    """本地规则引擎生成时政解读 payload（站点兜底用）。"""
+    items: list[dict[str, Any]] = _load_politics_items(start_ts, end_ts)
+    payload: dict[str, Any] = digest_engine.build_digest(
+        items, ntype, ndate, start_ts, end_ts, generator=generator)
+    payload["window_bj"] = window_label(start_ts, end_ts)
+    return payload
+
+
+def ensure_politics_digests() -> dict[str, str]:
+    """
+    时政解读的惰性兜底（与 ensure_digests 同策略）：
+    已过应生成时刻但仍缺失 → 先试 GitHub 同步拉回 Worker 产出，仍缺失则本地补生成。
+    """
+    out: dict[str, str] = {}
+    for ntype in ("yesterday", "today"):
+        ndate, start, end, due = common.digest_spec(ntype)
+        if time.time() < due:
+            out[ntype] = "skip"
+            continue
+        if portal_db.get_politics_digest(ntype, ndate) is not None:
+            out[ntype] = "skip"
+            continue
+        try:
+            news_sync.sync_politics(force=True)
+        except Exception:  # noqa: BLE001
+            pass
+        if portal_db.get_politics_digest(ntype, ndate) is not None:
+            out[ntype] = "synced"
+            continue
+        payload: dict[str, Any] = generate_politics_local(ntype, ndate, start, end,
+                                                          generator="lazy")
+        portal_db.upsert_politics_digest(ntype, ndate,
+                                         json.dumps(payload, ensure_ascii=False),
+                                         generator="lazy")
+        out[ntype] = "lazy"
+    return out
+
+
+def politics_digest_view(ntype: str) -> dict[str, Any]:
+    """时政解读展示视图（与 digest_view 同构；未生成时返回 pending 占位）。"""
+    ndate, start, end, due = common.digest_spec(ntype)
+    row = portal_db.get_politics_digest(ntype, ndate)
+    if row is None:
+        return {"exists": False, "pending": time.time() < due,
+                "ready_at": common.today_digest_ready_at() if ntype == "today" else "",
+                "type": ntype, "date": ndate}
+    try:
+        payload: dict[str, Any] = json.loads(str(row["payload"]))
+    except Exception:  # noqa: BLE001
+        payload = {"type": ntype, "date": ndate, "points": [], "keywords": [],
+                   "news_count": 0}
+    payload.setdefault("window_bj", window_label(start, end))
+    if not payload.get("article"):
+        try:
+            payload["article"] = digest_engine.compose_article_from_points(payload)
+        except Exception:  # noqa: BLE001
+            payload["article"] = None
+    payload.update({
+        "exists": True,
+        "generator": str(row["generator"]),
+        "edited": bool(row["edited"]),
+        "updated_at": float(row["updated_at"]),
+    })
+    return payload

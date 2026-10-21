@@ -56,6 +56,7 @@ def _static_v() -> str:
         "static/js/links.js", "static/js/utils/confetti.js",
         # 第六期新增前端资源
         "static/js/updates.js", "static/js/reset_password.js",
+        "static/js/attendance.js",
         # 第七期：皮肤包 + 语言切换
         "static/css/skins.css", "static/js/i18n.js",
     ]
@@ -209,7 +210,8 @@ def create_app() -> Flask:
         resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         resp.headers["X-Frame-Options"] = "DENY"
         resp.headers["Permissions-Policy"] = (
-            "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
+            # geolocation=(self)：考勤模块需要浏览器定位（仅本站自身可用，第三方仍禁）
+            "camera=(), microphone=(), geolocation=(self), payment=(), usb=()")
         # CSP：script 走 nonce（模板内联配置脚本必须执行）；
         # style 允许 unsafe-inline —— 模板存在大量动态 style= 属性（颜色/进度），
         # 样式注入风险低且不可执行脚本，属可接受残余风险（体检报告已注明依据）。
@@ -243,6 +245,7 @@ def create_app() -> Flask:
 
     # ---- 注册蓝图 ----
     from blueprints import activities as activities_bp
+    from blueprints import attendance as attendance_bp
     from blueprints import admin as admin_bp
     from blueprints import auth as auth_bp
     from blueprints import checkin as checkin_bp
@@ -267,6 +270,7 @@ def create_app() -> Flask:
     app.register_blueprint(digest_bp.bp)
     app.register_blueprint(tucao_bp.bp)
     app.register_blueprint(activities_bp.bp)
+    app.register_blueprint(attendance_bp.bp)
     app.register_blueprint(homework_bp.bp)
     app.register_blueprint(resources_bp.bp)
     app.register_blueprint(duty_bp.bp)
@@ -308,6 +312,7 @@ if __name__ == "__main__":
     portal_db.init_part5_db()   # 第 5 期新表（幂等；线上用 migrate_part5.py）
     portal_db.init_part6_db()   # 第 6 期新表（幂等；线上用 migrate_part6.py）
     portal_db.ensure_pwd_changed_column()  # 第 6 期 users 补列（幂等）
+    portal_db.init_attendance_db()   # 考勤表（幂等；线上用 migrate_attendance.py）
     # 本地 http 开发：Secure cookie 会发不下去，这里关掉（线上 WSGI 不受影响）
     app.config["SESSION_COOKIE_SECURE"] = False
     # 监听所有网卡；debug=False 避免 reloader fork 子进程导致浏览器连接不稳定

@@ -2248,3 +2248,147 @@ def bump_password_changed_at(user_id: int) -> None:
     with db.get_db() as conn:
         conn.execute("UPDATE users SET password_changed_at=? WHERE id=?",
                      (time.time(), user_id))
+
+
+# ============================================================
+# 日常考勤（定位签到）—— attendance 模块
+# ============================================================
+# 技术要点（参考 GitHub 定位考勤类项目的通行实践）：
+# 1. Haversine 球面距离，【服务端复核】——前端算距离只为体验，判定以服务端为准；
+# 2. 记录原始坐标 + 计算距离，争议时可回溯；
+# 3. UNIQUE(session_id, user_id) 数据库兜底防重复签到；
+# 4. GPS 漂移容差：有效距离 = 实测距离 - min(上报精度, 30m)，照顾室内边缘场景；
+# 5. 会话过期惰性关闭，不依赖定时任务。
+ATTENDANCE_SCHEMA: str = """
+CREATE TABLE IF NOT EXISTS attendance_sessions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT NOT NULL,
+    lat         REAL NOT NULL,
+    lng         REAL NOT NULL,
+    radius_m    INTEGER NOT NULL DEFAULT 100,
+    creator_id  INTEGER NOT NULL REFERENCES users(id),
+    status      TEXT NOT NULL DEFAULT 'open',      -- open / closed
+    ends_at     REAL NOT NULL,
+    created_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_att_session_status ON attendance_sessions(status, created_at);
+
+CREATE TABLE IF NOT EXISTS attendance_records (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  INTEGER NOT NULL REFERENCES attendance_sessions(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    lat         REAL NOT NULL,
+    lng         REAL NOT NULL,
+    distance_m  REAL NOT NULL,
+    created_at  REAL NOT NULL,
+    UNIQUE(session_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_att_records_user ON attendance_records(user_id, created_at);
+"""
+
+
+def init_attendance_db() -> None:
+    """考勤表（幂等；线上用 migrate_attendance.py）。"""
+    with db.get_db() as conn:
+        conn.executescript(ATTENDANCE_SCHEMA)
+
+
+def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Haversine 球面距离（米）。地球半径取 6371000。"""
+    import math
+    r: float = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp: float = math.radians(lat2 - lat1)
+    dl: float = math.radians(lng2 - lng1)
+    a: float = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def att_create_session(title: str, lat: float, lng: float, radius_m: int,
+                       creator_id: int, minutes: int) -> int:
+    now_ts: float = time.time()
+    with db.get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO attendance_sessions(title,lat,lng,radius_m,creator_id,status,"
+            " ends_at,created_at) VALUES (?,?,?,?,?, 'open', ?,?)",
+            (title, lat, lng, radius_m, creator_id, now_ts + minutes * 60, now_ts),
+        )
+        return int(cur.lastrowid)
+
+
+def att_get_session(session_id: int) -> Optional[sqlite3.Row]:
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT s.*, u.nickname AS creator_name FROM attendance_sessions s"
+            " JOIN users u ON u.id=s.creator_id WHERE s.id=?", (session_id,)).fetchone()
+
+
+def att_close_expired() -> None:
+    """惰性关闭到期的 open 会话（每次读考勤状态时顺手做）。"""
+    with db.get_db() as conn:
+        conn.execute(
+            "UPDATE attendance_sessions SET status='closed'"
+            " WHERE status='open' AND ends_at<?", (time.time(),))
+
+
+def att_open_session() -> Optional[sqlite3.Row]:
+    """当前进行中的会话（同时刻只允许一个，由创建接口保证）。"""
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT s.*, u.nickname AS creator_name FROM attendance_sessions s"
+            " JOIN users u ON u.id=s.creator_id"
+            " WHERE s.status='open' AND s.ends_at>=? ORDER BY s.id DESC LIMIT 1",
+            (time.time(),)).fetchone()
+
+
+def att_close_session(session_id: int) -> None:
+    with db.get_db() as conn:
+        conn.execute("UPDATE attendance_sessions SET status='closed' WHERE id=?",
+                     (session_id,))
+
+
+def att_add_record(session_id: int, user_id: int, lat: float, lng: float,
+                   distance_m: float) -> bool:
+    """写入签到记录；UNIQUE 兜底防重复。返回是否本次新签。"""
+    with db.get_db() as conn:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO attendance_records"
+            "(session_id,user_id,lat,lng,distance_m,created_at) VALUES (?,?,?,?,?,?)",
+            (session_id, user_id, lat, lng, distance_m, time.time()),
+        )
+        return cur.rowcount == 1
+
+
+def att_has_record(session_id: int, user_id: int) -> bool:
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT 1 AS x FROM attendance_records WHERE session_id=? AND user_id=?",
+            (session_id, user_id)).fetchone() is not None
+
+
+def att_session_records(session_id: int) -> list[sqlite3.Row]:
+    """某场考勤的签到名单（含距离，按时间升序）。"""
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT r.*, u.nickname FROM attendance_records r"
+            " JOIN users u ON u.id=r.user_id"
+            " WHERE r.session_id=? ORDER BY r.created_at", (session_id,)).fetchall()
+
+
+def att_recent_sessions(limit: int = 20) -> list[sqlite3.Row]:
+    """近期场次的列表（含签到人数，管理视图用）。"""
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT s.*, u.nickname AS creator_name,"
+            " (SELECT COUNT(*) FROM attendance_records r WHERE r.session_id=s.id) AS cnt"
+            " FROM attendance_sessions s JOIN users u ON u.id=s.creator_id"
+            " ORDER BY s.id DESC LIMIT ?", (limit,)).fetchall()
+
+
+def att_my_records(user_id: int, limit: int = 20) -> list[sqlite3.Row]:
+    """我的近期签到记录。"""
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT r.*, s.title FROM attendance_records r"
+            " JOIN attendance_sessions s ON s.id=r.session_id"
+            " WHERE r.user_id=? ORDER BY r.id DESC LIMIT ?", (user_id, limit)).fetchall()

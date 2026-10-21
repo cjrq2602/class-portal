@@ -38,6 +38,7 @@ PERMISSIONS: list[tuple[str, str]] = [
     ("announcement.manage", "公告管理"),
     ("audit.view", "审计日志查看"),
     ("game.manage", "游戏房间管理"),
+    ("attendance.manage", "考勤发起与管理"),
     ("news.manage", "新闻源与每日总结管理"),      # 第 2 期：新闻中心 + 每日总结
     ("tucao.moderate", "吐槽审核与敏感词管理"),    # 第 2 期：吐槽墙
     ("activity.manage", "活动与比赛管理"),         # 第 3 期
@@ -68,7 +69,8 @@ ROLES: dict[str, tuple[str, list[str]]] = {
     "post":  ("内容发布员", ["admin.access", "homework.manage", "honor.manage",
                              "announcement.manage", "audit.view"]),
     "life":  ("班级生活管理员", ["admin.access", "resource.manage", "duty.manage",
-                                 "audit.view"]),
+                                 "attendance.manage", "audit.view"]),
+    "attendance": ("考勤管理员", ["admin.access", "attendance.manage", "audit.view"]),
 }
 
 # ---------------- 管理员（用户名 → (角色, 默认昵称)） ----------------
@@ -81,6 +83,7 @@ ADMINS: list[tuple[str, str, str]] = [
     ("admin-game", "game", "游戏管理员"),
     ("admin-post", "post", "内容发布员"),
     ("admin-life", "life", "班级生活管理员"),
+    ("admin-attendance", "attendance", "考勤管理员"),
 ]
 
 

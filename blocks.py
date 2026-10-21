@@ -53,6 +53,9 @@ BLOCKS: list[dict[str, Any]] = [
      "hub": False, "online": True},
 
     # ---------------- 生活▾ ----------------
+    {"key": "attendance", "name": "日常考勤", "desc": "定位签到 · 100 米范围内自动成功",
+     "href": "/attendance", "icon": "map-pin", "color": "#EF4444", "menu": "life",
+     "tab": False, "hub": False, "online": True},
     {"key": "duty", "name": "值日表", "desc": "本周值日分工与轮换", "href": "/duty",
      "icon": "grid", "color": "#F97316", "menu": "life", "tab": False,
      "hub": False, "online": True},

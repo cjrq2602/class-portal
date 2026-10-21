@@ -242,3 +242,44 @@
 @media (prefers-reduced-motion: reduce) {
     .set-panel, .set-panel__bg { transition: none; }
 }
+
+/* 背景图缩略图网格（20 图 + 无背景） */
+.set-bgs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+.set-bg {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 4px 4px 6px;
+    border: 2px solid transparent;
+    border-radius: var(--r-8);
+    background: var(--bg-hover);
+    cursor: pointer;
+    transition: border-color var(--dur-fast) var(--ease),
+                transform var(--dur-fast) var(--ease);
+}
+.set-bg:hover { transform: translateY(-1px); }
+.set-bg.is-active { border-color: var(--c-primary); }
+.set-bg__thumb {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: 5px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.set-bg__thumb--none {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: 5px;
+    background: var(--bg-card);
+    border: 1px dashed var(--border-2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-3);
+    font-size: var(--fs-12);
+}
+.set-bg__name {
+    font-size: var(--fs-12);
+    color: var(--text-2);
+    line-height: 1.2;
+}

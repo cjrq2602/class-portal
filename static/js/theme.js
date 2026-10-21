@@ -1,9 +1,10 @@
 /* ============================================================
-   theme.js —— 外观设置（明暗模式 / 皮肤包 / 语言 / 音效）
+   theme.js —— 外观设置（明暗模式 / 皮肤包 / 背景图 / 语言 / 音效）
    ============================================================
    存储（localStorage）：
      portal_mode    auto | light | dark     （默认 auto，跟随系统）
      portal_skin    default | sakura | forest | sunset | ocean | mono
+     portal_bg      aurora | sakura | ... | twilight | none（背景图）
      portal_locale  zh-CN | zh-TW
      portal_theme   兼容第五期旧键（dark/light），仅作为 mode 的初值
    在 <head> 中执行，先于渲染应用属性，避免闪屏。
@@ -15,11 +16,20 @@
 (function () {
     const LS_MODE = "portal_mode";
     const LS_SKIN = "portal_skin";
+    const LS_BG = "portal_bg";
     const LS_LOCALE = "portal_locale";
     const LS_THEME_OLD = "portal_theme";
 
     const MODES = ["auto", "light", "dark"];
     const SKINS = ["default", "sakura", "forest", "sunset", "ocean", "mono"];
+    /* 背景图清单：与 static/img/bg/bg-<id>.jpg 一一对应；
+       none = 无背景（纯色页面）。aurora 为默认。 */
+    const BGS = [
+        "aurora", "sakura", "forest", "sunset", "ocean", "mono",
+        "mint", "lavender", "peach", "sky", "lilac", "lime",
+        "rosegold", "butter", "glacier", "matcha", "taro", "coral",
+        "sage", "twilight", "none"
+    ];
     const LOCALES = ["zh-CN", "zh-TW"];
 
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -37,6 +47,11 @@
     function getSkin() {
         const saved = localStorage.getItem(LS_SKIN);
         return SKINS.indexOf(saved) >= 0 ? saved : "default";
+    }
+
+    function getBg() {
+        const saved = localStorage.getItem(LS_BG);
+        return BGS.indexOf(saved) >= 0 ? saved : "aurora";
     }
 
     function getLocale() {
@@ -68,6 +83,19 @@
         document.documentElement.dataset.skin = skin;
     }
 
+    function applyBg(bg, persist) {
+        if (BGS.indexOf(bg) < 0) bg = "aurora";
+        if (persist) localStorage.setItem(LS_BG, bg);
+        document.documentElement.dataset.bg = bg;
+        if (bg === "none") {
+            // data-bg="none" 时 CSS 关掉伪元素，变量无需设置
+            document.documentElement.style.removeProperty("--bg-image");
+        } else {
+            document.documentElement.style.setProperty(
+                "--bg-image", 'url("/static/img/bg/bg-' + bg + '.jpg")');
+        }
+    }
+
     function applyLocale(locale, persist) {
         if (LOCALES.indexOf(locale) < 0) locale = "zh-CN";
         if (persist) localStorage.setItem(LS_LOCALE, locale);
@@ -77,6 +105,7 @@
     /* ---------------- 初始化（head 阶段，防闪屏） ---------------- */
     applyMode(getMode(), false);
     applySkin(getSkin(), false);
+    applyBg(getBg(), false);
     applyLocale(getLocale(), false);
 
     // 系统偏好变化：仅 auto 模式跟随
@@ -86,9 +115,10 @@
 
     // 暴露给设置面板与其他脚本
     window.PortalAppearance = {
-        getMode: getMode, getSkin: getSkin, getLocale: getLocale,
+        getMode: getMode, getSkin: getSkin, getBg: getBg, getLocale: getLocale,
         setMode: function (m) { applyMode(m, true); },
         setSkin: function (s) { applySkin(s, true); },
+        setBg: function (b) { applyBg(b, true); },
         setLocale: function (l) {
             applyLocale(l, true);
             // 简繁转换依赖整页重渲染，切换后直接刷新最稳
@@ -149,6 +179,14 @@
             });
         });
 
+        /* 背景图 */
+        document.querySelectorAll("[data-set-bg]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                applyBg(btn.dataset.setBg, true);
+                syncPanel();
+            });
+        });
+
         /* 语言 */
         document.querySelectorAll("[data-set-locale]").forEach((btn) => {
             btn.addEventListener("click", () => {
@@ -171,12 +209,16 @@
         function syncPanel() {
             const mode = getMode();
             const skin = getSkin();
+            const bg = getBg();
             const locale = getLocale();
             document.querySelectorAll("[data-set-mode]").forEach((b) => {
                 b.classList.toggle("is-active", b.dataset.setMode === mode);
             });
             document.querySelectorAll("[data-set-skin]").forEach((b) => {
                 b.classList.toggle("is-active", b.dataset.setSkin === skin);
+            });
+            document.querySelectorAll("[data-set-bg]").forEach((b) => {
+                b.classList.toggle("is-active", b.dataset.setBg === bg);
             });
             document.querySelectorAll("[data-set-locale]").forEach((b) => {
                 b.classList.toggle("is-active", b.dataset.setLocale === locale);

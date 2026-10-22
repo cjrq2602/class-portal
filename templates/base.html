@@ -370,6 +370,29 @@
             </div>
         </div>
 
+        <!-- 卡片质感 + 透明度（存在本机浏览器） -->
+        <div class="set-group">
+            <div class="set-group__title">卡片质感</div>
+            <div class="set-seg set-seg--wrap">
+                <button class="set-seg__btn" data-set-cardglass="default" type="button">默认</button>
+                <button class="set-seg__btn" data-set-cardglass="frost" type="button">毛玻璃</button>
+                <button class="set-seg__btn" data-set-cardglass="glass" type="button">玻璃质感</button>
+                <button class="set-seg__btn" data-set-cardglass="clear" type="button">透明玻璃</button>
+                <button class="set-seg__btn" data-set-cardglass="tint" type="button">彩色玻璃</button>
+            </div>
+            <div class="set-row mt-12">
+                <div>
+                    <div class="set-row__label">卡片透明度</div>
+                    <div class="set-row__hint">数值越低越透，背景图越清晰</div>
+                </div>
+                <div class="set-range">
+                    <input type="range" id="set-cardalpha" min="10" max="100" step="1" value="55"
+                           aria-label="卡片透明度">
+                    <span class="set-range__val" id="set-cardalpha-val">55%</span>
+                </div>
+            </div>
+        </div>
+
         <!-- 语言 -->
         <div class="set-group">
             <div class="set-group__title">语言</div>

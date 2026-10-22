@@ -18,6 +18,8 @@
     const LS_SKIN = "portal_skin";
     const LS_BG = "portal_bg";
     const LS_NAVGLASS = "portal_navglass";
+    const LS_CARDGLASS = "portal_cardglass";
+    const LS_CARDALPHA = "portal_cardalpha";
     const LS_LOCALE = "portal_locale";
     const LS_THEME_OLD = "portal_theme";
 
@@ -44,6 +46,11 @@
     /* 导航栏质感：default 现有半透明白 / frost 加强毛玻璃 /
        dark 深色玻璃（导航内文字转浅色）/ tint 主色彩玻璃（跟随皮肤色） */
     const NAVGLASSES = ["default", "frost", "dark", "tint"];
+    /* 卡片质感：default 纯白卡片 / frost 毛玻璃 / glass 玻璃质感 /
+       clear 透明玻璃 / tint 彩色玻璃（跟随皮肤色） */
+    const CARDGLASSES = ["default", "frost", "glass", "clear", "tint"];
+    /* 没手动调过透明度时，各卡片质感用的默认百分比 */
+    const CARDGLASS_ALPHA = { frost: 55, glass: 38, clear: 16, tint: 50 };
 
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -70,6 +77,17 @@
     function getNavglass() {
         const saved = localStorage.getItem(LS_NAVGLASS);
         return NAVGLASSES.indexOf(saved) >= 0 ? saved : "default";
+    }
+
+    function getCardglass() {
+        const saved = localStorage.getItem(LS_CARDGLASS);
+        return CARDGLASSES.indexOf(saved) >= 0 ? saved : "default";
+    }
+
+    /* 卡片透明度：10~100 的百分比；null = 没手动调过，跟随质感默认值 */
+    function getCardalpha() {
+        const saved = parseInt(localStorage.getItem(LS_CARDALPHA) || "", 10);
+        return (saved >= 10 && saved <= 100) ? saved : null;
     }
 
     function getLocale() {
@@ -120,6 +138,20 @@
         document.documentElement.dataset.navglass = v;
     }
 
+    function applyCardglass(v, persist) {
+        if (CARDGLASSES.indexOf(v) < 0) v = "default";
+        if (persist) localStorage.setItem(LS_CARDGLASS, v);
+        document.documentElement.dataset.cardglass = v;
+    }
+
+    /* 透明度写为 0.10~1.00 的内联变量，CSS 各质感用 var(--card-alpha, 默认) 消费 */
+    function applyCardalpha(pct, persist) {
+        pct = Math.max(10, Math.min(100, Math.round(pct)));
+        if (persist) localStorage.setItem(LS_CARDALPHA, String(pct));
+        document.documentElement.style.setProperty(
+            "--card-alpha", (pct / 100).toFixed(2));
+    }
+
     function applyLocale(locale, persist) {
         if (LOCALES.indexOf(locale) < 0) locale = "zh-CN";
         if (persist) localStorage.setItem(LS_LOCALE, locale);
@@ -131,6 +163,9 @@
     applySkin(getSkin(), false);
     applyBg(getBg(), false);
     applyNavglass(getNavglass(), false);
+    applyCardglass(getCardglass(), false);
+    const savedAlpha = getCardalpha();
+    if (savedAlpha !== null) applyCardalpha(savedAlpha, false);
     applyLocale(getLocale(), false);
 
     // 系统偏好变化：仅 auto 模式跟随
@@ -141,11 +176,13 @@
     // 暴露给设置面板与其他脚本
     window.PortalAppearance = {
         getMode: getMode, getSkin: getSkin, getBg: getBg, getLocale: getLocale,
-        getNavglass: getNavglass,
+        getNavglass: getNavglass, getCardglass: getCardglass, getCardalpha: getCardalpha,
         setMode: function (m) { applyMode(m, true); },
         setSkin: function (s) { applySkin(s, true); },
         setBg: function (b) { applyBg(b, true); },
         setNavglass: function (v) { applyNavglass(v, true); },
+        setCardglass: function (v) { applyCardglass(v, true); },
+        setCardalpha: function (p) { applyCardalpha(p, true); },
         setLocale: function (l) {
             applyLocale(l, true);
             // 简繁转换依赖整页重渲染，切换后直接刷新最稳
@@ -222,6 +259,24 @@
             });
         });
 
+        /* 卡片质感 */
+        document.querySelectorAll("[data-set-cardglass]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                applyCardglass(btn.dataset.setCardglass, true);
+                syncPanel();
+            });
+        });
+
+        /* 卡片透明度滑杆：拖动即生效并记忆 */
+        const alphaRange = document.getElementById("set-cardalpha");
+        const alphaVal = document.getElementById("set-cardalpha-val");
+        if (alphaRange) {
+            alphaRange.addEventListener("input", () => {
+                applyCardalpha(parseInt(alphaRange.value, 10), true);
+                syncPanel();
+            });
+        }
+
         /* 语言 */
         document.querySelectorAll("[data-set-locale]").forEach((btn) => {
             btn.addEventListener("click", () => {
@@ -259,6 +314,20 @@
             document.querySelectorAll("[data-set-navglass]").forEach((b) => {
                 b.classList.toggle("is-active", b.dataset.setNavglass === navglass);
             });
+            /* 卡片质感 + 透明度滑杆状态 */
+            const cardglass = getCardglass();
+            document.querySelectorAll("[data-set-cardglass]").forEach((b) => {
+                b.classList.toggle("is-active", b.dataset.setCardglass === cardglass);
+            });
+            if (alphaRange) {
+                const stored = getCardalpha();
+                const eff = stored !== null ? stored : (CARDGLASS_ALPHA[cardglass] || 55);
+                // 拖动中不回写滑杆位置，避免跟手跳动
+                if (document.activeElement !== alphaRange) alphaRange.value = eff;
+                if (alphaVal) alphaVal.textContent = eff + "%";
+                const wrap = alphaRange.closest(".set-range");
+                if (wrap) wrap.classList.toggle("is-disabled", cardglass === "default");
+            }
             document.querySelectorAll("[data-set-locale]").forEach((b) => {
                 b.classList.toggle("is-active", b.dataset.setLocale === locale);
             });

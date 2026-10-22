@@ -1507,3 +1507,80 @@ html[data-navglass="tint"][data-theme="dark"] {
     html[data-navglass="tint"] { --nav-bg: rgba(79, 110, 247, 0.16); }
     html[data-navglass="tint"][data-theme="dark"] { --nav-bg: rgba(79, 110, 247, 0.30); }
 }
+
+/* ============================================================
+   卡片质感变体（设置面板可选，挂在 html[data-cardglass]）
+   default = tokens.css 的 --bg-card 纯白卡片，无需覆写。
+   透明度由 --card-alpha（0.10~1.00，设置面板滑杆）统一控制；
+   未手动调过时，各变体用 var() 兜底里的默认值。
+   应用对象：.card 及首页三大块（.home-bar / .today-chip / .home-entry）
+   ============================================================ */
+html[data-cardglass]:not([data-cardglass="default"]) .card,
+html[data-cardglass]:not([data-cardglass="default"]) .home-bar,
+html[data-cardglass]:not([data-cardglass="default"]) .today-chip,
+html[data-cardglass]:not([data-cardglass="default"]) .home-entry {
+    background: var(--cg-bg);
+    border-color: var(--cg-border);
+    backdrop-filter: blur(var(--cg-blur)) saturate(var(--cg-sat));
+    -webkit-backdrop-filter: blur(var(--cg-blur)) saturate(var(--cg-sat));
+    transition: background var(--dur-mid) var(--ease),
+                border-color var(--dur-mid) var(--ease);
+}
+
+/* 毛玻璃：强模糊 + 中透明，最百搭 */
+html[data-cardglass="frost"] {
+    --cg-bg: rgba(255, 255, 255, var(--card-alpha, 0.55));
+    --cg-blur: 22px; --cg-sat: 180%;
+    --cg-border: rgba(255, 255, 255, 0.42);
+}
+html[data-cardglass="frost"][data-theme="dark"] {
+    --cg-bg: rgba(19, 26, 42, var(--card-alpha, 0.60));
+    --cg-border: rgba(255, 255, 255, 0.12);
+}
+
+/* 玻璃质感：中模糊 + 顶部高光描边，最有「玻璃片」感 */
+html[data-cardglass="glass"] {
+    --cg-bg: rgba(255, 255, 255, var(--card-alpha, 0.38));
+    --cg-blur: 14px; --cg-sat: 160%;
+    --cg-border: rgba(255, 255, 255, 0.55);
+}
+html[data-cardglass="glass"][data-theme="dark"] {
+    --cg-bg: rgba(19, 26, 42, var(--card-alpha, 0.45));
+    --cg-border: rgba(255, 255, 255, 0.16);
+}
+html[data-cardglass="glass"] .card,
+html[data-cardglass="glass"] .home-bar,
+html[data-cardglass="glass"] .today-chip,
+html[data-cardglass="glass"] .home-entry {
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+/* 透明玻璃：轻模糊 + 高透，背景图几乎直透 */
+html[data-cardglass="clear"] {
+    --cg-bg: rgba(255, 255, 255, var(--card-alpha, 0.16));
+    --cg-blur: 8px; --cg-sat: 140%;
+    --cg-border: rgba(255, 255, 255, 0.30);
+}
+html[data-cardglass="clear"][data-theme="dark"] {
+    --cg-bg: rgba(19, 26, 42, var(--card-alpha, 0.25));
+    --cg-border: rgba(255, 255, 255, 0.08);
+}
+
+/* 彩色玻璃：跟随皮肤主色的淡彩（换皮肤即换色调） */
+html[data-cardglass="tint"] {
+    --cg-bg: color-mix(in srgb, var(--c-primary) 14%,
+             rgba(255, 255, 255, var(--card-alpha, 0.50)));
+    --cg-blur: 18px; --cg-sat: 170%;
+    --cg-border: color-mix(in srgb, var(--c-primary) 32%, transparent);
+}
+html[data-cardglass="tint"][data-theme="dark"] {
+    --cg-bg: color-mix(in srgb, var(--c-primary) 22%,
+             rgba(19, 26, 42, var(--card-alpha, 0.55)));
+}
+@supports not (background: color-mix(in srgb, red 10%, transparent)) {
+    /* 老浏览器兜底：固定守夜蓝淡彩 */
+    html[data-cardglass="tint"] {
+        --cg-bg: rgba(79, 110, 247, var(--card-alpha, 0.14));
+        --cg-border: rgba(79, 110, 247, 0.30);
+    }
+}

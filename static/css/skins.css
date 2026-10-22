@@ -227,11 +227,20 @@
 .set-switch.is-on { background: var(--c-primary); }
 .set-switch.is-on::after { transform: translateX(20px); }
 
-.set-range {
-    width: 100%;
+/* 滑杆行（卡片透明度） */
+.set-range { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.set-range input[type="range"] {
+    width: 130px;
     accent-color: var(--c-primary);
-    margin-top: 4px;
+    cursor: pointer;
 }
+.set-range__val {
+    min-width: 42px; text-align: right;
+    font-size: var(--fs-13); font-weight: 600; color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+}
+/* 卡片质感为「默认」时滑杆置灰禁用 */
+.set-range.is-disabled { opacity: 0.4; pointer-events: none; }
 
 /* 顶栏设置按钮 */
 .nav__icon-btn#settings-toggle { position: relative; }

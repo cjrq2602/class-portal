@@ -1327,34 +1327,70 @@ async function renderCheckinAdmin(c) {
     });
 }
 
-/* ================= 第四期：点名名单管理 ================= */
+/* ================= 第四期：点名名单管理（第九期加分组与批量上传） ================= */
+let roGroup = 0;   // 0 = 全部
+
+/** 把粘贴/文件文本拆成姓名数组（换行、逗号、顿号、分号、制表符分隔） */
+function parseNamesText(text) {
+    return String(text || "").split(/[\n\r,，、;；\t]+/)
+        .map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
 async function renderRosterAdmin(c) {
     Skeleton.inject(c, 4);
-    const r = await fetchJSON("/api/admin/roster");
+    const r = await fetchJSON("/api/admin/roster" +
+        (roGroup > 0 ? `?group_id=${roGroup}` : ""));
     const list = r.list || [];
+    const groups = r.groups || [];
+    const curG = groups.find((g) => g.id === roGroup);
+    const groupOpts = (sel) => groups.map((g) =>
+        `<option value="${g.id}"${g.id === sel ? " selected" : ""}>${esc(g.name)}</option>`).join("");
+
     c.innerHTML = `<div class="card">
         <div class="flex-between flex-wrap gap-8">
             <div class="card__title" style="margin-bottom:0">
                 ${icon("zap", 18)} 点名名单（在册 ${r.active_count} / 共 ${list.length}）</div>
-            <button class="btn btn--primary btn--sm" id="ro-import">
-                ${icon("refresh", 15)} 从用户一键导入</button>
+            <div class="flex gap-8 flex-wrap">
+                <button class="btn btn--primary btn--sm" id="ro-batch">
+                    ${icon("plus", 15)} 批量上传名单</button>
+                <button class="btn btn--outline btn--sm" id="ro-import">
+                    ${icon("refresh", 15)} 从用户一键导入</button>
+            </div>
         </div>
         <p class="text-muted" style="font-size:var(--fs-13)">
-            从 users 导入会取昵称并自动去重；已停用的成员不参与抽取。
-            随机点名页支持"排除已点过的"与"勾选请假者不参与"。
+            批量上传支持直接粘贴（每行一个姓名）或选择 .txt / .csv 文件，自动去重；
+            从 users 导入取昵称进「${esc(groups[0] ? groups[0].name : "默认名单")}」；
+            已停用的成员不参与抽取。
         </p>
-        <div class="flex gap-8 mt-16 flex-wrap">
+        <div class="flex gap-8 mt-16 flex-wrap" style="align-items:center">
+            <select class="input" id="ro-group" style="max-width:160px">
+                <option value="0"${roGroup === 0 ? " selected" : ""}>全部分组</option>
+                ${groupOpts(roGroup)}
+            </select>
+            <input class="input" id="ro-new-group" placeholder="新分组名（如 燃气2603）"
+                maxlength="20" style="max-width:180px">
+            <button class="btn btn--secondary btn--sm" id="ro-group-add">建分组</button>
+            ${curG && curG.id !== (groups[0] && groups[0].id)
+                ? `<button class="btn btn--danger btn--sm" id="ro-group-del">删除「${esc(curG.name)}」</button>`
+                : ""}
+        </div>
+        <div class="flex gap-8 mt-12 flex-wrap">
             <input class="input" id="ro-name" placeholder="姓名" maxlength="20" style="max-width:180px">
             <input class="input" id="ro-seat" type="number" min="0" placeholder="座位号"
                 style="max-width:120px">
+            <select class="input" id="ro-add-group" style="max-width:140px">${groupOpts(curG ? curG.id : 0)}</select>
             <button class="btn btn--primary btn--sm" id="ro-add">${icon("plus", 15)} 新增</button>
         </div>
         <div style="overflow-x:auto" class="mt-16"><table class="admin-table">
-        <thead><tr><th>ID</th><th>座位</th><th>姓名</th><th>状态</th><th>操作</th></tr></thead>
+        <thead><tr><th>ID</th><th>座位</th><th>姓名</th><th>分组</th><th>状态</th><th>操作</th></tr></thead>
         <tbody>${list.map((m) => `<tr>
             <td class="num">${m.id}</td>
             <td class="num">${m.seat_no || "—"}</td>
             <td>${avatarHtml(m.name, "avatar--sm")} <b>${esc(m.name)}</b></td>
+            <td><select class="input input--sm" data-ro-group="${m.id}"
+                data-name="${esc(m.name)}" data-seat="${m.seat_no}"
+                data-active="${m.is_active ? 1 : 0}" style="min-width:110px">
+                ${groupOpts(m.group_id)}</select></td>
             <td>${m.is_active ? '<span class="tag tag--success">在册</span>'
                 : '<span class="tag">已停用</span>'}</td>
             <td style="white-space:nowrap">
@@ -1363,10 +1399,96 @@ async function renderRosterAdmin(c) {
                     data-name="${esc(m.name)}" data-seat="${m.seat_no}">
                     ${m.is_active ? "停用" : "启用"}</button>
                 <button class="btn btn--sm btn--danger" data-ro-del="${m.id}">删除</button>
-            </td></tr>`).join("") || '<tr><td colspan="5" class="text-center text-faint">名单为空，点右上角一键导入</td></tr>'}
+            </td></tr>`).join("") || '<tr><td colspan="6" class="text-center text-faint">该分组名单为空，点上方「批量上传名单」或「从用户一键导入」</td></tr>'}
         </tbody></table></div>
     </div>`;
 
+    /* ---- 分组筛选 / 新建 / 删除 ---- */
+    document.getElementById("ro-group").onchange = (e) => {
+        roGroup = parseInt(e.target.value, 10);
+        renderRosterAdmin(c);
+    };
+    document.getElementById("ro-group-add").onclick = async () => {
+        const name = document.getElementById("ro-new-group").value.trim();
+        if (!name) { Toast.show("请输入分组名", "warning"); return; }
+        try {
+            const rr = await fetchJSON("/api/admin/roster/group_add", {
+                method: "POST", body: { name } });
+            Toast.show("分组已创建", "success");
+            roGroup = rr.group_id;
+            renderRosterAdmin(c);
+        } catch (e) { /* 已提示 */ }
+    };
+    const gdel = document.getElementById("ro-group-del");
+    if (gdel) gdel.onclick = async () => {
+        const sure = await Modal.confirm({
+            title: `删除分组「${curG.name}」`,
+            body: "只有空分组可以删除。删除后不可恢复，确认？",
+            okText: "删除",
+        });
+        if (!sure) return;
+        try {
+            await fetchJSON("/api/admin/roster/group_delete", {
+                method: "POST", body: { id: curG.id } });
+            Toast.show("分组已删除", "success");
+            roGroup = 0;
+            renderRosterAdmin(c);
+        } catch (e) { /* 已提示（非空组会被服务端拒绝） */ }
+    };
+
+    /* ---- 批量上传（粘贴 / txt / csv） ---- */
+    document.getElementById("ro-batch").onclick = () => {
+        const overlay = Modal.open({
+            title: "批量上传名单",
+            body: `
+                <p class="text-muted" style="font-size:var(--fs-13)">
+                    每行一个姓名（也支持逗号、顿号分隔）。可粘贴文本，或选择
+                    .txt / .csv 文件（Excel 请先「另存为 CSV」）。
+                </p>
+                <select class="input" id="ro-batch-group" style="max-width:200px">
+                    ${groupOpts(curG ? curG.id : 0)}
+                </select>
+                <textarea class="input mt-12" id="ro-batch-text" rows="8"
+                    placeholder="张三\n李四\n王五"></textarea>
+                <div class="flex gap-8 mt-12" style="align-items:center">
+                    <input type="file" id="ro-batch-file" accept=".txt,.csv" class="text-muted">
+                </div>
+                <p class="text-faint mt-8" style="font-size:var(--fs-12)" id="ro-batch-count"></p>`,
+            foot: `<button class="btn btn--primary" id="ro-batch-ok">导入</button>
+                   <button class="btn btn--ghost" id="ro-batch-cancel">取消</button>`,
+        });
+        const textEl = overlay.querySelector("#ro-batch-text");
+        const countEl = overlay.querySelector("#ro-batch-count");
+        const refreshCount = () => {
+            const n = parseNamesText(textEl.value).length;
+            countEl.textContent = n ? `已识别 ${n} 个姓名` : "";
+        };
+        textEl.addEventListener("input", refreshCount);
+        overlay.querySelector("#ro-batch-file").addEventListener("change", (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = () => { textEl.value = String(reader.result || ""); refreshCount(); };
+            reader.readAsText(f, "utf-8");
+        });
+        overlay.querySelector("#ro-batch-cancel").onclick = () => Modal.close(overlay);
+        overlay.querySelector("#ro-batch-ok").onclick = async () => {
+            const names = parseNamesText(textEl.value);
+            if (!names.length) { Toast.show("请先粘贴或选择名单文件", "warning"); return; }
+            const gid = parseInt(overlay.querySelector("#ro-batch-group").value, 10);
+            try {
+                const rr = await fetchJSON("/api/admin/roster/batch_add", {
+                    method: "POST", body: { group_id: gid, names } });
+                Modal.close(overlay);
+                Toast.show(`导入完成：新增 ${rr.added} 人` +
+                    (rr.skipped_dup ? `，跳过重复 ${rr.skipped_dup} 人` : ""), "success", 3500);
+                roGroup = gid;
+                renderRosterAdmin(c);
+            } catch (e) { /* 已提示 */ }
+        };
+    };
+
+    /* ---- 导入 users / 单个新增 / 行操作 ---- */
     document.getElementById("ro-import").onclick = async () => {
         const rr = await fetchJSON("/api/admin/roster/import_users", { method: "POST", body: {} });
         Toast.show(`导入完成：新增 ${rr.added} 人，在册共 ${rr.total} 人`, "success");
@@ -1378,12 +1500,26 @@ async function renderRosterAdmin(c) {
         try {
             await fetchJSON("/api/admin/roster/add", {
                 method: "POST",
-                body: { name, seat_no: parseInt(document.getElementById("ro-seat").value || "0", 10) },
+                body: { name, seat_no: parseInt(document.getElementById("ro-seat").value || "0", 10),
+                        group_id: parseInt(document.getElementById("ro-add-group").value, 10) },
             });
             Toast.show("已新增", "success");
             renderRosterAdmin(c);
         } catch (e) { /* 已提示 */ }
     };
+    c.querySelectorAll("[data-ro-group]").forEach((sel) => {
+        sel.onchange = async () => {
+            await fetchJSON("/api/admin/roster/update", {
+                method: "POST",
+                body: { id: parseInt(sel.dataset.roGroup, 10), name: sel.dataset.name,
+                        seat_no: parseInt(sel.dataset.seat || "0", 10),
+                        is_active: sel.dataset.active === "1",
+                        group_id: parseInt(sel.value, 10) },
+            });
+            Toast.show("已移动分组", "success");
+            renderRosterAdmin(c);
+        };
+    });
     c.querySelectorAll("[data-ro-toggle]").forEach((b) => {
         b.onclick = async () => {
             const active = b.dataset.active !== "1";

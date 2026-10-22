@@ -10,7 +10,9 @@
 
 const PK = window.__PK__ || { can_manage: false };
 
-let ROSTER = [];          // 全部在册成员 [{id,name,seat_no}]
+let ROSTER = [];          // 当前分组在册成员 [{id,name,seat_no,group_id,group_name}]
+let GROUPS = [];          // 全部分组 [{id,name,count,active_count}]
+let CUR_GROUP = 0;        // 0 = 全部在册
 let ABSENT = new Set();   // 本次请假（id）
 let HISTORY = [];         // 本次已点姓名
 let DRAWING = false;
@@ -121,7 +123,8 @@ function renderHistory() {
 }
 
 function loadRoster() {
-    fetchJSON("/api/picker/roster").then((r) => {
+    const url = "/api/picker/roster" + (CUR_GROUP > 0 ? `?group_id=${CUR_GROUP}` : "");
+    fetchJSON(url).then((r) => {
         ROSTER = r.list || [];
         renderRoster();
     }).catch(() => {
@@ -129,6 +132,32 @@ function loadRoster() {
         document.getElementById("pk-roster").innerHTML =
             '<span class="text-danger">名单加载失败，请刷新重试</span>';
     });
+}
+
+/* ================= 分组切换 ================= */
+function renderGroups() {
+    const box = document.getElementById("pk-groups");
+    if (!box) return;
+    const totalActive = GROUPS.reduce((s, g) => s + g.active_count, 0);
+    const all = [{ id: 0, name: "全部", active_count: totalActive }].concat(GROUPS);
+    box.innerHTML = '<span class="text-faint" style="font-size:var(--fs-12);' +
+        'align-self:center">分组：</span>' + all.map((g) =>
+        `<button class="chip${CUR_GROUP === g.id ? " chip--active" : ""}" data-gid="${g.id}">
+            ${esc(g.name)} ${g.active_count}</button>`).join("");
+    box.querySelectorAll("[data-gid]").forEach((b) => {
+        b.onclick = () => {
+            CUR_GROUP = parseInt(b.dataset.gid, 10);
+            renderGroups();
+            loadRoster();
+        };
+    });
+}
+
+function loadGroups() {
+    fetchJSON("/api/picker/groups").then((r) => {
+        GROUPS = r.list || [];
+        renderGroups();
+    }).catch(() => { /* 分组加载失败不影响全部名单抽取 */ });
 }
 
 /* ================= 抽取：2 秒减速翻滚 → 放大定格 ================= */
@@ -150,6 +179,7 @@ async function draw() {
         const r = await fetchJSON("/api/picker/draw", {
             method: "POST",
             body: {
+                group_id: CUR_GROUP,
                 exclude_drawn: document.getElementById("pk-exclude-drawn").checked,
                 drawn_names: HISTORY,
                 absent_ids: Array.from(ABSENT),
@@ -247,6 +277,7 @@ document.addEventListener("keydown", (e) => {
     }
 });
 
+loadGroups();
 loadRoster();
 renderHistory();
 document.getElementById("pk-absent-count").textContent = "已选 0 人";

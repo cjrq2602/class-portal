@@ -1723,6 +1723,153 @@ def member_count() -> int:
 
 
 # ============================================================
+# 第九期：点名名单分组（roster_groups + class_members.group_id）
+# ============================================================
+ROSTER_GROUP_SCHEMA: str = """
+CREATE TABLE IF NOT EXISTS roster_groups (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL UNIQUE,
+    created_at REAL NOT NULL
+);
+"""
+
+DEFAULT_GROUP_ID: int = 1
+DEFAULT_GROUP_NAME: str = "默认名单"
+
+
+def init_roster_groups() -> None:
+    """分组表 + class_members.group_id 列（幂等；线上用 migrate_roster_groups.py）。"""
+    with db.get_db() as conn:
+        conn.executescript(ROSTER_GROUP_SCHEMA)
+        cols = [str(r["name"]) for r in
+                conn.execute("PRAGMA table_info(class_members)").fetchall()]
+        if "group_id" not in cols:
+            conn.execute("ALTER TABLE class_members"
+                         " ADD COLUMN group_id INTEGER NOT NULL DEFAULT 1")
+        conn.execute(
+            "INSERT OR IGNORE INTO roster_groups(id, name, created_at) VALUES (?,?,?)",
+            (DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME, time.time()))
+
+
+def roster_groups() -> list[dict[str, Any]]:
+    """全部分组（含成员数，按 id 排序）。"""
+    with db.get_db() as conn:
+        rows = conn.execute(
+            "SELECT g.id, g.name,"
+            " (SELECT COUNT(*) FROM class_members m WHERE m.group_id=g.id) AS cnt,"
+            " (SELECT COUNT(*) FROM class_members m"
+            "   WHERE m.group_id=g.id AND m.is_active=1) AS active_cnt"
+            " FROM roster_groups g ORDER BY g.id").fetchall()
+        return [{"id": int(r["id"]), "name": str(r["name"]),
+                 "count": int(r["cnt"]), "active_count": int(r["active_cnt"])}
+                for r in rows]
+
+
+def roster_group_add(name: str) -> Optional[int]:
+    """新建分组（名字唯一；重复返回 None）。"""
+    name = name.strip()[:20]
+    if not name:
+        return None
+    with db.get_db() as conn:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO roster_groups(name, created_at) VALUES (?,?)",
+            (name, time.time()))
+        return int(cur.lastrowid) if cur.rowcount == 1 else None
+
+
+def roster_group_delete(group_id: int) -> tuple[bool, str]:
+    """删除分组。默认组/不存在的组/非空组不可删。返回 (成功与否, 原因)。"""
+    if group_id == DEFAULT_GROUP_ID:
+        return False, "默认名单不可删除"
+    with db.get_db() as conn:
+        row = conn.execute("SELECT id FROM roster_groups WHERE id=?",
+                           (group_id,)).fetchone()
+        if row is None:
+            return False, "分组不存在"
+        cnt = int(conn.execute("SELECT COUNT(*) FROM class_members WHERE group_id=?",
+                               (group_id,)).fetchone()[0])
+        if cnt > 0:
+            return False, f"分组里还有 {cnt} 人，请先把他们移走或删除"
+        conn.execute("DELETE FROM roster_groups WHERE id=?", (group_id,))
+        return True, ""
+
+
+def member_list_group(active_only: bool = False,
+                      group_id: int = 0) -> list[sqlite3.Row]:
+    """名单查询：group_id=0 全部，>0 只看该组。"""
+    sql = "SELECT m.*, g.name AS group_name FROM class_members m" \
+          " LEFT JOIN roster_groups g ON g.id=m.group_id"
+    cond: list[str] = []
+    args: list[Any] = []
+    if active_only:
+        cond.append("m.is_active=1")
+    if group_id > 0:
+        cond.append("m.group_id=?")
+        args.append(group_id)
+    if cond:
+        sql += " WHERE " + " AND ".join(cond)
+    sql += " ORDER BY m.group_id, m.seat_no, m.id"
+    with db.get_db() as conn:
+        return conn.execute(sql, args).fetchall()
+
+
+def member_add_to_group(name: str, seat_no: int = 0,
+                        group_id: int = DEFAULT_GROUP_ID) -> bool:
+    """新增到指定分组（name 全局唯一；重复返回 False）。"""
+    with db.get_db() as conn:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO class_members(name, seat_no, is_active, created_at, group_id)"
+            " VALUES (?,?,1,?,?)",
+            (name[:20], int(seat_no), time.time(), int(group_id)))
+        return cur.rowcount == 1
+
+
+def member_batch_add(names: list[str],
+                     group_id: int = DEFAULT_GROUP_ID) -> dict[str, Any]:
+    """批量导入名单：去空白/去重（本批 + 库内），单个截 20 字。
+    返回 {added, skipped_dup, invalid}。"""
+    added: int = 0
+    skipped_dup: int = 0
+    invalid: int = 0
+    seen: set[str] = set()
+    with db.get_db() as conn:
+        for raw in names:
+            name = str(raw).strip()[:20]
+            if not name:
+                invalid += 1
+                continue
+            if name in seen:
+                skipped_dup += 1
+                continue
+            seen.add(name)
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO class_members(name, seat_no, is_active,"
+                " created_at, group_id) VALUES (?,0,1,?,?)",
+                (name, time.time(), int(group_id)))
+            if cur.rowcount == 1:
+                added += 1
+            else:
+                skipped_dup += 1
+    return {"added": added, "skipped_dup": skipped_dup, "invalid": invalid}
+
+
+def member_set_group(member_id: int, group_id: int) -> None:
+    with db.get_db() as conn:
+        conn.execute("UPDATE class_members SET group_id=? WHERE id=?",
+                     (int(group_id), member_id))
+
+
+def member_count_group(group_id: int = 0) -> int:
+    with db.get_db() as conn:
+        if group_id > 0:
+            return int(conn.execute(
+                "SELECT COUNT(*) FROM class_members WHERE is_active=1 AND group_id=?",
+                (group_id,)).fetchone()[0])
+        return int(conn.execute("SELECT COUNT(*) FROM class_members WHERE is_active=1"
+                                ).fetchone()[0])
+
+
+# ============================================================
 # 第五期：登录日志 / 资源导航（友情链接）/ 超级管理员
 # ============================================================
 PART5_SCHEMA: str = """
@@ -2305,7 +2452,7 @@ def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 
 def att_create_session(title: str, lat: float, lng: float, radius_m: int,
-                       creator_id: int, minutes: int) -> int:
+                       creator_id: int, minutes: float) -> int:
     now_ts: float = time.time()
     with db.get_db() as conn:
         cur = conn.execute(

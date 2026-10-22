@@ -16,7 +16,8 @@
     var S = {
         session: null,        // 当前进行中的考勤
         loc: null,            // {lat, lng, accuracy}
-        locState: "idle",     // idle/locating/ready/error
+        locState: "idle",     // idle/locating/ready/error/insecure
+        locError: "",         // 定位失败的具体原因（展示给用户）
         checked: false,
         submitting: false,
         locTimer: null,
@@ -37,14 +38,37 @@
         return fmtBeijing(unixSec, true);
     }
 
-    /* ---------- 定位（持续刷新，GPS 漂移取最新） ---------- */
+    /* ---------- 定位（持续刷新，GPS 漂移取最新） ----------
+       失败必答"为什么"：非安全上下文（http://）/ 拒绝授权 / 信号弱 / 超时，
+       分别给出可操作的修复指引，而不是一句笼统的"定位失败"。 */
+    function locErrorText(err) {
+        if (!err || typeof err.code === "undefined") return "未知原因，请重试";
+        if (err.code === 1) return "定位权限被拒绝。请点地址栏左侧的锁形/设置图标 →" +
+            " 网站设置 → 位置信息 → 允许，然后点「重新定位」（微信内打开请改用系统浏览器）";
+        if (err.code === 2) return "暂时获取不到位置（GPS 信号弱）。请到窗边或室外、" +
+            " 或打开 Wi-Fi 辅助定位后重试";
+        if (err.code === 3) return "定位超时。请确认已开启系统定位服务后重试";
+        return err.message || "未知原因，请重试";
+    }
+
     function startLocate() {
+        if (!window.isSecureContext) {
+            S.locState = "insecure";
+            S.locError = "浏览器只在 HTTPS 安全连接下提供定位。" +
+                "请确认网址以 https:// 开头（把 http:// 改成 https:// 再打开）";
+            renderStudent();
+            if (CFG.can_manage) renderManage();
+            return;
+        }
         if (!navigator.geolocation) {
             S.locState = "error";
+            S.locError = "当前浏览器不支持定位，请换用系统浏览器（Safari/Chrome/Edge）打开";
             renderStudent();
+            if (CFG.can_manage) renderManage();
             return;
         }
         S.locState = "locating";
+        S.locError = "";
         renderStudent();
         navigator.geolocation.getCurrentPosition(function (pos) {
             S.loc = { lat: pos.coords.latitude, lng: pos.coords.longitude,
@@ -52,10 +76,22 @@
             S.locState = "ready";
             renderStudent();
             maybeAutoCheckin();
-        }, function () {
+        }, function (err) {
             S.locState = "error";
+            S.locError = locErrorText(err);
             renderStudent();
-        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
+            if (CFG.can_manage) renderManage();
+        }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
+    }
+
+    /* 定位状态一句话（管理区/学生区共用） */
+    function locStateLine() {
+        if (S.locState === "ready" && S.loc) {
+            return "✅ 已定位（精度约 " + Math.round(S.loc.accuracy) + " 米）";
+        }
+        if (S.locState === "locating" || S.locState === "idle") return "⏳ 正在获取定位…";
+        if (S.locState === "insecure") return "⚠️ " + S.locError;
+        return "⚠️ 定位失败：" + S.locError;
     }
 
     /* ---------- 拉取考勤状态 ---------- */
@@ -108,10 +144,13 @@
         }
         var s = S.session;
         var left = Math.max(0, Math.round(s.ends_at - (Date.now() / 1000)));
+        var leftText = left >= 90
+            ? "剩余 " + Math.ceil(left / 60) + " 分钟"
+            : "剩余 " + left + " 秒";
         var head = '<div class="flex-between flex-wrap gap-8">' +
             '<h2>🟢 ' + escapeHtml(s.title) + '</h2>' +
             '<span class="text-faint" style="font-size:var(--fs-12)">发起人：' +
-            escapeHtml(s.creator_name) + ' · 剩余 ' + Math.ceil(left / 60) + ' 分钟</span></div>';
+            escapeHtml(s.creator_name) + ' · ' + leftText + '</span></div>';
 
         if (S.checked) {
             studentEl.innerHTML = '<section class="card">' + head +
@@ -124,9 +163,14 @@
         if (S.locState === "locating" || S.locState === "idle") {
             body = '<div class="text-center mt-16"><div class="skeleton skeleton--text"></div>' +
                 '<p class="text-muted mt-8">正在获取你的位置…（请授权定位）</p></div>';
-        } else if (S.locState === "error") {
-            body = '<div class="text-center mt-16"><p class="text-danger">定位失败：请检查定位权限后重试</p>' +
-                '<button class="btn btn--secondary mt-12" id="att-retry">重新定位</button></div>';
+        } else if (S.locState === "error" || S.locState === "insecure") {
+            body = '<div class="text-center mt-16">' +
+                '<p class="text-danger" style="max-width:420px;margin:0 auto">' +
+                escapeHtml(locStateLine().replace(/^⚠️\s*/, "")) + '</p>' +
+                (S.locState === "error"
+                    ? '<button class="btn btn--secondary mt-12" id="att-retry">重新定位</button>'
+                    : "") +
+                '</div>';
         } else {
             var d = distM(S.loc.lat, S.loc.lng, s.lat, s.lng);
             var inRange = (d - Math.min(S.loc.accuracy, 30)) <= s.radius_m;
@@ -179,10 +223,12 @@
             html += '<div class="mt-12 flex flex-wrap gap-8">' +
                 '<input class="input" id="att-title" maxlength="30" placeholder="考勤名称（默认：日常考勤）" style="max-width:240px">' +
                 '<select class="input" id="att-minutes" style="max-width:140px">' +
-                '<option value="10">10 分钟</option><option value="15" selected>15 分钟</option>' +
-                '<option value="20">20 分钟</option><option value="30">30 分钟</option></select>' +
+                '<option value="0.5">30 秒</option><option value="1">1 分钟</option>' +
+                '<option value="2" selected>2 分钟</option><option value="5">5 分钟</option>' +
+                '<option value="10">10 分钟</option></select>' +
                 '<button class="btn btn--primary" id="att-create">📍 以我的定位发起</button></div>' +
-                '<p class="text-faint mt-8" style="font-size:var(--fs-12)">发起时将获取你的实时定位作为考勤点，半径 100 米</p>';
+                '<p class="text-faint mt-8" style="font-size:var(--fs-12)">发起时将获取你的实时定位作为考勤点，半径 100 米 · ' +
+                '<span id="att-loc-state">' + escapeHtml(locStateLine()) + '</span></p>';
         }
         html += '<div class="mt-16"><h3 style="font-size:var(--fs-14)">近期场次</h3>' +
             '<div id="att-history" class="mt-8"></div></div></section>';
@@ -191,12 +237,16 @@
         var createBtn = document.getElementById("att-create");
         if (createBtn) createBtn.onclick = function () {
             if (S.locState !== "ready" || !S.loc) {
-                Toast.show("正在获取你的定位，请稍候再点", "warning");
-                startLocate();
+                if (S.locState === "error" || S.locState === "insecure") {
+                    Toast.show(S.locError || "定位失败，请先解决定位问题", "danger", 4000);
+                } else {
+                    Toast.show("正在获取你的定位，请稍候再点", "warning");
+                }
+                if (S.locState !== "insecure") startLocate();
                 return;
             }
             var title = document.getElementById("att-title").value.trim();
-            var minutes = parseInt(document.getElementById("att-minutes").value, 10);
+            var minutes = parseFloat(document.getElementById("att-minutes").value);
             fetchJSON("/api/attendance/create", { method: "POST", body: {
                 title: title, minutes: minutes, lat: S.loc.lat, lng: S.loc.lng,
             } }).then(function () {

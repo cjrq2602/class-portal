@@ -318,6 +318,7 @@ if __name__ == "__main__":
     portal_db.ensure_pwd_changed_column()  # 第 6 期 users 补列（幂等）
     portal_db.init_attendance_db()   # 考勤表（幂等；线上用 migrate_attendance.py）
     portal_db.init_politics_db()     # 时政三表（幂等；线上用 migrate_politics.py）
+    portal_db.init_roster_groups()   # 点名分组（幂等；线上用 migrate_roster_groups.py）
     # 本地 http 开发：Secure cookie 会发不下去，这里关掉（线上 WSGI 不受影响）
     app.config["SESSION_COOKIE_SECURE"] = False
     # 监听所有网卡；debug=False 避免 reloader fork 子进程导致浏览器连接不稳定

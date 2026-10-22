@@ -27,7 +27,8 @@ bp: Blueprint = Blueprint("attendance", __name__)
 RADIUS_M: int = 100           # 默认签到半径（需求定死 100 米）
 ACCURACY_TOLERANCE_M: float = 30.0   # GPS 精度容差上限
 MAX_TITLE_LEN: int = 30
-DURATION_CHOICES: tuple[int, ...] = (10, 15, 20, 30)   # 分钟
+DURATION_CHOICES: tuple[float, ...] = (0.5, 1, 2, 5, 10)   # 分钟（0.5 = 30 秒快闪考勤）
+DEFAULT_DURATION_MIN: float = 2.0
 
 
 def _can_manage(uid: Optional[int]) -> bool:
@@ -98,13 +99,13 @@ def api_create():
     try:
         lat: float = float(body.get("lat"))
         lng: float = float(body.get("lng"))
-        minutes: int = int(body.get("minutes", 15))
+        minutes: float = float(body.get("minutes", DEFAULT_DURATION_MIN))
     except (TypeError, ValueError):
         return common.err("定位参数非法")
     if not (-90 <= lat <= 90 and -180 <= lng <= 180):
         return common.err("定位参数越界")
     if minutes not in DURATION_CHOICES:
-        minutes = 15
+        minutes = DEFAULT_DURATION_MIN
 
     portal_db.att_close_expired()
     if portal_db.att_open_session() is not None:

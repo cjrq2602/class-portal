@@ -243,11 +243,17 @@
     .set-panel, .set-panel__bg { transition: none; }
 }
 
-/* 背景图缩略图网格（20 图 + 无背景） */
+/* 背景图缩略图网格（渐变 20 图 + 插画 24 图 + 无背景） */
 .set-bgs {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 8px;
+}
+.set-bgs__label {
+    grid-column: 1 / -1;
+    font-size: var(--fs-12);
+    color: var(--text-faint);
+    margin: 6px 0 -2px 2px;
 }
 .set-bg {
     display: flex; flex-direction: column; align-items: center; gap: 4px;

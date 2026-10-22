@@ -23,12 +23,21 @@
     const MODES = ["auto", "light", "dark"];
     const SKINS = ["default", "sakura", "forest", "sunset", "ocean", "mono"];
     /* 背景图清单：与 static/img/bg/bg-<id>.jpg 一一对应；
-       none = 无背景（纯色页面）。aurora 为默认。 */
+       none = 无背景（纯色页面）。aurora 为默认。
+       第九期新增 24 张插画图：anime 动漫风景 / animechar 动漫人物 /
+       game 游戏人物 / nature 自然 / wild 旷野 / cozy 温馨，各 4 张。 */
     const BGS = [
         "aurora", "sakura", "forest", "sunset", "ocean", "mono",
         "mint", "lavender", "peach", "sky", "lilac", "lime",
         "rosegold", "butter", "glacier", "matcha", "taro", "coral",
-        "sage", "twilight", "none"
+        "sage", "twilight",
+        "anime1", "anime2", "anime3", "anime4",
+        "animechar1", "animechar2", "animechar3", "animechar4",
+        "game1", "game2", "game3", "game4",
+        "nature1", "nature2", "nature3", "nature4",
+        "wild1", "wild2", "wild3", "wild4",
+        "cozy1", "cozy2", "cozy3", "cozy4",
+        "none"
     ];
     const LOCALES = ["zh-CN", "zh-TW"];
 

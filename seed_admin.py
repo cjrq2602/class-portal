@@ -71,6 +71,8 @@ ROLES: dict[str, tuple[str, list[str]]] = {
     "life":  ("班级生活管理员", ["admin.access", "resource.manage", "duty.manage",
                                  "attendance.manage", "audit.view"]),
     "attendance": ("考勤管理员", ["admin.access", "attendance.manage", "audit.view"]),
+    # 班长：考勤页内发起/结束/补签（不需要进管理后台）
+    "monitor": ("班长", ["attendance.manage"]),
 }
 
 # ---------------- 管理员（用户名 → (角色, 默认昵称)） ----------------

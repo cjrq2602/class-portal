@@ -15,6 +15,7 @@
 
     var S = {
         session: null,        // 当前进行中的考勤
+        groups: [],           // 名单分组（管理端发起表单下拉用）
         loc: null,            // {lat, lng, accuracy}
         locState: "idle",     // idle/locating/ready/error/insecure
         locError: "",         // 定位失败的具体原因（展示给用户）
@@ -115,9 +116,17 @@
         try {
             var r = await fetchJSON("/api/attendance/state");
             S.session = r.session;
+            S.groups = r.groups || S.groups;
             if (S.session) S.checked = !!S.session.checked_in;
             renderStudent();
-            if (CFG.can_manage) renderManage();
+            // 焦点在管理区内（正在填标题/选分组）时只刷名单，不重建表单
+            if (CFG.can_manage) {
+                if (manageEl && manageEl.contains(document.activeElement)) {
+                    loadLive();
+                } else {
+                    renderManage();
+                }
+            }
             maybeAutoCheckin();
         } catch (e) { /* fetchJSON 已提示 */ }
     }
@@ -231,22 +240,34 @@
         if (S.session) {
             html += '<div class="mt-12 flex-between flex-wrap gap-8">' +
                 '<span>进行中场次：<b>' + escapeHtml(S.session.title) + '</b>（已签 ' +
-                (S.session.record_count || 0) + ' 人）</span>' +
+                (S.session.record_count || 0) + ' 人' +
+                (S.session.group_name ? ' · 名单：' + escapeHtml(S.session.group_name) : '') +
+                '）</span>' +
                 '<button class="btn btn--danger btn--sm" id="att-close">结束本场考勤</button></div>' +
                 '<div id="att-live" class="mt-12"></div>';
         } else {
+            var groupOpts = '<option value="0">不关联名单</option>' +
+                (S.groups || []).map(function (g) {
+                    return '<option value="' + g.id + '">' + escapeHtml(g.name) +
+                        '（' + g.count + ' 人）</option>';
+                }).join("");
             html += '<div class="mt-12 flex flex-wrap gap-8">' +
                 '<input class="input" id="att-title" maxlength="30" placeholder="考勤名称（默认：日常考勤）" style="max-width:240px">' +
                 '<select class="input" id="att-minutes" style="max-width:140px">' +
                 '<option value="0.5">30 秒</option><option value="1">1 分钟</option>' +
                 '<option value="2" selected>2 分钟</option><option value="5">5 分钟</option>' +
                 '<option value="10">10 分钟</option></select>' +
+                '<select class="input" id="att-group" style="max-width:190px">' +
+                groupOpts + '</select>' +
                 '<button class="btn btn--primary" id="att-create">📍 以我的定位发起</button></div>' +
                 '<p class="text-faint mt-8" style="font-size:var(--fs-12)">发起时将获取你的实时定位作为考勤点，半径 ' +
                 (CFG.radius || 300) + ' 米 · ' +
-                '<span id="att-loc-state">' + escapeHtml(locStateLine()) + '</span></p>';
+                '<span id="att-loc-state">' + escapeHtml(locStateLine()) + '</span></p>' +
+                '<p class="text-faint" style="font-size:var(--fs-12)">关联名单后，结束后自动列出<b>未签到同学</b>，' +
+                '可手动补签；名单分组在<a href="/picker">随机点名</a>页创建与导入（如 燃气2602）· ' +
+                '场次与名单保留 2 天</p>';
         }
-        html += '<div class="mt-16"><h3 style="font-size:var(--fs-14)">近期场次</h3>' +
+        html += '<div class="mt-16"><h3 style="font-size:var(--fs-14)">近期场次（点场次看明细）</h3>' +
             '<div id="att-history" class="mt-8"></div></div></section>';
         manageEl.innerHTML = html;
 
@@ -263,8 +284,10 @@
             }
             var title = document.getElementById("att-title").value.trim();
             var minutes = parseFloat(document.getElementById("att-minutes").value);
+            var groupId = parseInt(document.getElementById("att-group").value, 10) || 0;
             fetchJSON("/api/attendance/create", { method: "POST", body: {
                 title: title, minutes: minutes, lat: S.loc.lat, lng: S.loc.lng,
+                group_id: groupId,
             } }).then(function () {
                 Toast.show("考勤已发起", "success");
                 refresh();
@@ -272,12 +295,18 @@
         };
         var closeBtn = document.getElementById("att-close");
         if (closeBtn) closeBtn.onclick = function () {
+            var closingId = S.session.id;
             Modal.confirm({ title: "结束考勤", body: "结束后同学将无法再签到，确认结束？",
                             okText: "结束" }).then(function (yes) {
                 if (!yes) return;
                 fetchJSON("/api/attendance/close", { method: "POST",
-                    body: { session_id: S.session.id } })
-                    .then(function () { Toast.show("已结束", "success"); refresh(); })
+                    body: { session_id: closingId } })
+                    .then(function () {
+                        Toast.show("已结束", "success");
+                        refresh();
+                        // 结束后自动展开该场明细（未签到名单在这里）
+                        setTimeout(function () { toggleHist(closingId, true); }, 700);
+                    })
                     .catch(function () {});
             });
         };
@@ -285,22 +314,97 @@
         loadLive();
     }
 
+    /* ---------- 对账名单（关联分组的场次：未签到 + 补签） ---------- */
+    function rosterHtml(r) {
+        var html = "";
+        if (!r.roster) {
+            // 未关联名单：退回旧的纯签到记录列表
+            if (!r.records.length) return '<p class="text-faint">还没有人签到…</p>';
+            return r.records.map(function (x) {
+                return '<div class="flex-between" style="padding:6px 0;border-bottom:1px dashed var(--border-1)">' +
+                    '<span>' + escapeHtml(x.nickname) + '</span>' +
+                    '<span class="text-faint" style="font-size:var(--fs-12)">' +
+                    Math.round(x.distance_m) + ' 米 · ' + fmtTime(x.created_at) + '</span></div>';
+            }).join("");
+        }
+        var signed = [], unsigned = [];
+        r.roster.forEach(function (x) { (x.checked_in ? signed : unsigned).push(x); });
+        html += '<div class="mt-8" style="font-size:var(--fs-13)">📋 <b>' +
+            escapeHtml(r.session.group_name) + '</b> 对账：应到 ' + r.roster.length +
+            ' · 已签 ' + signed.length + ' · ' +
+            (unsigned.length
+                ? '<span class="text-danger" style="font-weight:700">未签 ' + unsigned.length + '</span>'
+                : '<span class="text-success" style="font-weight:700">全员到齐 ✅</span>') +
+            '</div>';
+        if (unsigned.length) {
+            html += '<div class="mt-8">' + unsigned.map(function (x) {
+                return '<div class="flex-between" style="padding:6px 0;border-bottom:1px dashed var(--border-1)">' +
+                    '<span>' + escapeHtml(x.name) +
+                    (x.has_account ? "" :
+                        ' <span class="text-faint" style="font-size:var(--fs-12)">（无账号）</span>') +
+                    '</span>' +
+                    (x.has_account
+                        ? '<button class="btn btn--outline btn--sm" data-att-mid="' + x.member_id + '">补签</button>'
+                        : "") +
+                    '</div>';
+            }).join("") + '</div>';
+        }
+        if (signed.length) {
+            html += '<details class="mt-8"><summary class="text-faint" style="cursor:pointer;font-size:var(--fs-12)">' +
+                '已签到名单（' + signed.length + ' 人）</summary>' +
+                signed.map(function (x) {
+                    return '<div class="flex-between" style="padding:6px 0;border-bottom:1px dashed var(--border-1)">' +
+                        '<span>' + escapeHtml(x.name) +
+                        (x.manual ? ' <span class="text-faint" style="font-size:var(--fs-12)">（补签）</span>' : "") +
+                        '</span>' +
+                        '<span class="text-faint" style="font-size:var(--fs-12)">' +
+                        (x.checked_at ? fmtTime(x.checked_at) : "") + '</span></div>';
+                }).join("") + '</details>';
+        }
+        return html;
+    }
+
+    /* 绑定补签按钮（box 内渲染后调用；reloadFn 补签成功后刷新本区域） */
+    function bindManual(box, sid, reloadFn) {
+        box.querySelectorAll("[data-att-mid]").forEach(function (btn) {
+            btn.onclick = function () {
+                btn.disabled = true;
+                fetchJSON("/api/attendance/manual_checkin", { method: "POST",
+                    body: { session_id: sid, member_id: parseInt(btn.dataset.attMid, 10) } })
+                    .then(function (r) {
+                        Toast.show("已为 " + (r.name || "该同学") + " 补签", "success");
+                        reloadFn();
+                        loadMy();
+                    })
+                    .catch(function () { btn.disabled = false; });
+            };
+        });
+    }
+
     function loadLive() {
         var box = document.getElementById("att-live");
         if (!box || !S.session) return;
-        fetchJSON("/api/attendance/records?session_id=" + S.session.id)
+        var sid = S.session.id;
+        fetchJSON("/api/attendance/records?session_id=" + sid)
             .then(function (r) {
-                if (!r.records.length) {
-                    box.innerHTML = '<p class="text-faint">还没有人签到…</p>';
-                    return;
-                }
-                box.innerHTML = r.records.map(function (x) {
-                    return '<div class="flex-between" style="padding:6px 0;border-bottom:1px dashed var(--border-1)">' +
-                        '<span>' + escapeHtml(x.nickname) + '</span>' +
-                        '<span class="text-faint" style="font-size:var(--fs-12)">' +
-                        Math.round(x.distance_m) + ' 米 · ' + fmtTime(x.created_at) + '</span></div>';
-                }).join("");
+                box.innerHTML = rosterHtml(r);
+                bindManual(box, sid, loadLive);
             }).catch(function () {});
+    }
+
+    /* 历史场次：点击展开/收起明细（含未签到名单与补签） */
+    function toggleHist(sid, forceOpen) {
+        var detail = document.getElementById("att-hist-" + sid);
+        if (!detail) return;
+        var open = detail.style.display !== "none";
+        if (open && !forceOpen) { detail.style.display = "none"; return; }
+        detail.style.display = "block";
+        detail.innerHTML = '<p class="text-faint" style="font-size:var(--fs-12)">加载中…</p>';
+        fetchJSON("/api/attendance/records?session_id=" + sid)
+            .then(function (r) {
+                detail.innerHTML = rosterHtml(r);
+                bindManual(detail, sid, function () { toggleHist(sid, true); });
+            }).catch(function () { detail.innerHTML = ""; });
     }
 
     function loadHistory() {
@@ -312,13 +416,22 @@
                 return;
             }
             box.innerHTML = r.sessions.map(function (x) {
-                return '<div class="flex-between" style="padding:6px 0;border-bottom:1px dashed var(--border-1)">' +
+                return '<div>' +
+                    '<div class="flex-between att-hist-row" data-sid="' + x.id + '" ' +
+                    'style="padding:6px 0;border-bottom:1px dashed var(--border-1);cursor:pointer">' +
                     '<span>' + escapeHtml(x.title) +
                     (x.status === "open" ? ' <span class="text-success">●进行中</span>' : "") +
+                    (x.group_name ? ' <span class="text-faint" style="font-size:var(--fs-12)">📋' +
+                        escapeHtml(x.group_name) + '</span>' : "") +
                     '</span><span class="text-faint" style="font-size:var(--fs-12)">' +
                     x.count + ' 人 · ' + escapeHtml(x.creator_name) + ' · ' + fmtTime(x.created_at) +
-                    '</span></div>';
+                    '</span></div>' +
+                    '<div id="att-hist-' + x.id + '" style="display:none;padding:4px 0 8px"></div>' +
+                    '</div>';
             }).join("");
+            box.querySelectorAll(".att-hist-row").forEach(function (row) {
+                row.onclick = function () { toggleHist(parseInt(row.dataset.sid, 10), false); };
+            });
         }).catch(function () {});
     }
 

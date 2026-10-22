@@ -3,10 +3,13 @@ blueprints/attendance.py —— 日常考勤（定位签到，/attendance + /api
 ==============================================================================
 规则（页面明示，前后端同一套）：
   · 发起人需 attendance.manage 权限；发起时取发起人实时定位为考勤点；
-  · 签到半径默认 100 米（GPS 漂移容差：有效距离 = 实测距离 - min(上报精度, 30m)）；
+  · 签到半径默认 300 米（GPS 漂移容差：有效距离 = 实测距离 - min(上报精度, 30m)）；
   · 距离判定【服务端复核】（Haversine），前端只作体验展示；
   · 同一时刻只允许一场进行中的考勤；每人每场只能签一次（UNIQUE 兜底）；
-  · 到期会话惰性关闭，不依赖定时任务。
+  · 到期会话惰性关闭，不依赖定时任务；
+  · 发起时可关联点名模块的名单分组（如 燃气2602）：按「账号昵称 = 名单姓名」
+    自动对账，管理端可见应到/已签/未签名单，并可对未签到者手动补签；
+  · 场次与签到名单保留 2 天（ATT_RETENTION_DAYS），过期惰性清除。
 坐标系说明：浏览器 Geolocation 返回 WGS-84 坐标，两端同源，直接比较无纠偏问题。
 """
 
@@ -38,12 +41,24 @@ def _can_manage(uid: Optional[int]) -> bool:
     return portal_db.ADMIN_FULL_PERM in perms or "attendance.manage" in perms
 
 
+def _group_name(group_id: int) -> str:
+    """名单分组名（0 或不存在返回空串）。"""
+    if group_id <= 0:
+        return ""
+    for g in portal_db.roster_groups():
+        if int(g["id"]) == group_id:
+            return str(g["name"])
+    return ""
+
+
 def _session_view(s: Any, with_coords: bool = True) -> dict[str, Any]:
+    gid: int = int(s["group_id"]) if "group_id" in s.keys() else 0
     v: dict[str, Any] = {
         "id": int(s["id"]), "title": str(s["title"]),
         "radius_m": int(s["radius_m"]), "status": str(s["status"]),
         "creator_name": str(s["creator_name"]),
         "ends_at": float(s["ends_at"]), "created_at": float(s["created_at"]),
+        "group_id": gid, "group_name": _group_name(gid),
     }
     if with_coords:
         v["lat"] = float(s["lat"])
@@ -78,8 +93,14 @@ def api_state():
         return common.err("请先登录", "auth", 401)
     portal_db.att_close_expired()
     s = portal_db.att_open_session()
-    out: dict[str, Any] = {"can_manage": _can_manage(uid),
+    can: bool = _can_manage(uid)
+    out: dict[str, Any] = {"can_manage": can,
                            "server_ts": time.time(), "session": None}
+    if can:
+        # 发起表单的名单分组下拉用（点名模块的分组，考勤复用）
+        out["groups"] = [{"id": int(g["id"]), "name": str(g["name"]),
+                          "count": int(g["active_count"])}
+                         for g in portal_db.roster_groups()]
     if s is not None:
         out["session"] = _session_view(s)
         out["session"]["checked_in"] = portal_db.att_has_record(int(s["id"]), uid)
@@ -101,20 +122,27 @@ def api_create():
         lat: float = float(body.get("lat"))
         lng: float = float(body.get("lng"))
         minutes: float = float(body.get("minutes", DEFAULT_DURATION_MIN))
+        group_id: int = int(body.get("group_id", 0) or 0)
     except (TypeError, ValueError):
         return common.err("定位参数非法")
     if not (-90 <= lat <= 90 and -180 <= lng <= 180):
         return common.err("定位参数越界")
     if minutes not in DURATION_CHOICES:
         minutes = DEFAULT_DURATION_MIN
+    if group_id > 0 and not _group_name(group_id):
+        return common.err("名单分组不存在")
+    if group_id < 0:
+        group_id = 0
 
     portal_db.att_close_expired()
     if portal_db.att_open_session() is not None:
         return common.err("已有进行中的考勤，请先结束")
 
-    sid: int = portal_db.att_create_session(title, lat, lng, RADIUS_M, uid, minutes)
+    sid: int = portal_db.att_create_session(title, lat, lng, RADIUS_M, uid,
+                                            minutes, group_id)
     portal_db.add_audit(uid, "attendance.create", str(sid),
-                        f"title={title} minutes={minutes}", common.client_ip())
+                        f"title={title} minutes={minutes} group_id={group_id}",
+                        common.client_ip())
     return common.ok({"session_id": sid})
 
 
@@ -191,21 +219,82 @@ def api_records():
     if s is None:
         return common.err("考勤不存在", "not_found", 404)
     rows = portal_db.att_session_records(sid)
-    return common.ok({
+    out: dict[str, Any] = {
         "session": _session_view(s, with_coords=False),
         "records": [{"nickname": r["nickname"], "distance_m": round(float(r["distance_m"]), 1),
+                     "manual": bool(r["manual"]) if "manual" in r.keys() else False,
                      "created_at": float(r["created_at"])} for r in rows],
-    })
+    }
+    # 关联了名单分组：附应到对账（已签/未签/是否有账号），未签到排在前面
+    gid: int = int(s["group_id"]) if "group_id" in s.keys() else 0
+    if gid > 0:
+        roster = portal_db.att_session_roster(sid, gid)
+        out["roster"] = [
+            {"member_id": int(r["member_id"]), "name": str(r["name"]),
+             "has_account": r["user_id"] is not None,
+             "checked_in": r["record_id"] is not None,
+             "manual": bool(r["manual"]) if r["record_id"] is not None else False,
+             "checked_at": float(r["checked_at"]) if r["checked_at"] is not None else None}
+            for r in roster]
+        out["unsigned_count"] = sum(1 for x in out["roster"] if not x["checked_in"])
+    return common.ok(out)
+
+
+# ============================================================
+# 手动补签（attendance.manage；把未到同学从「未签到」名单里消掉）
+# ============================================================
+@bp.route("/api/attendance/manual_checkin", methods=["POST"])
+@common.api_wrap
+@require_perm("attendance.manage")
+def api_manual_checkin():
+    body: dict = request.get_json(silent=True) or {}
+    try:
+        sid: int = int(body.get("session_id"))
+        member_id: int = int(body.get("member_id"))
+    except (TypeError, ValueError):
+        return common.err("参数非法")
+
+    s = portal_db.att_get_session(sid)
+    if s is None:
+        return common.err("考勤不存在", "not_found", 404)
+    gid: int = int(s["group_id"]) if "group_id" in s.keys() else 0
+    if gid <= 0:
+        return common.err("本场考勤没有关联名单分组")
+
+    # 在该场对账名单里找到这位同学（顺带完成归属校验）
+    target = None
+    for r in portal_db.att_session_roster(sid, gid):
+        if int(r["member_id"]) == member_id:
+            target = r
+            break
+    if target is None:
+        return common.err("该同学不在本场考勤名单里", "not_found", 404)
+    if target["record_id"] is not None:
+        return common.err("该同学已签到，无需补签")
+    if target["user_id"] is None:
+        return common.err("「" + str(target["name"]) + "」还没有注册账号，"
+                          "需先用真实姓名注册后才能补签")
+
+    portal_db.att_add_record(sid, int(target["user_id"]),
+                             float(s["lat"]), float(s["lng"]), 0.0, manual=True)
+    op_uid: int = int(auth_bp.current_user_id())
+    portal_db.add_audit(op_uid, "attendance.manual_checkin", str(sid),
+                        f"member={target['name']}", common.client_ip())
+    return common.ok({"name": str(target["name"])})
 
 
 @bp.route("/api/attendance/history", methods=["GET"])
 @common.api_wrap
 @require_perm("attendance.manage")
 def api_history():
+    portal_db.att_close_expired()   # 顺手做 2 天留存清理
     rows = portal_db.att_recent_sessions(20)
     return common.ok({"sessions": [
         {"id": int(r["id"]), "title": str(r["title"]), "status": str(r["status"]),
          "creator_name": str(r["creator_name"]), "count": int(r["cnt"]),
+         "group_id": int(r["group_id"]) if "group_id" in r.keys() else 0,
+         "group_name": _group_name(int(r["group_id"]))
+                       if "group_id" in r.keys() and int(r["group_id"]) > 0 else "",
          "created_at": float(r["created_at"]), "ends_at": float(r["ends_at"])}
         for r in rows]})
 

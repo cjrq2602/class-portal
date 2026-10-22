@@ -6,10 +6,13 @@ migrate_attendance.py —— 线上迁移：考勤模块（日常考勤 / 定位
 
 行为（全部幂等，可重复执行）：
 1. 建考勤表 attendance_sessions / attendance_records（IF NOT EXISTS）；
+   老库自动补列：sessions.group_id（关联名单分组）、records.manual（补签标记）；
 2. 复用 seed_admin 的幂等逻辑：写入 attendance.manage 权限、
-   attendance 角色（考勤管理员）、life 角色追加考勤权限、
+   attendance 角色（考勤管理员）、monitor 角色（班长）、life 角色追加考勤权限、
    新建 admin-attendance 账号（密码仅本次打印）；
 3. 写审计留痕。
+备注：名单分组与成员由 migrate_roster_groups.py / 随机点名页维护，
+考勤模块直接复用（按「账号昵称 = 名单姓名」对账）。
 """
 
 from __future__ import annotations

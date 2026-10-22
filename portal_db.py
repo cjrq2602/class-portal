@@ -452,6 +452,16 @@ def get_user_by_username(username: str) -> Optional[sqlite3.Row]:
         ).fetchone()
 
 
+def get_user_by_nickname(nickname: str) -> Optional[sqlite3.Row]:
+    """按昵称精确匹配（考勤名单对账用：名单姓名 = 账号昵称）。"""
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT u.*, r.name AS role_name, r.display_name AS role_display"
+            " FROM users u JOIN roles r ON r.id=u.role_id WHERE u.nickname=?",
+            (nickname,),
+        ).fetchone()
+
+
 def get_user(user_id: int) -> Optional[sqlite3.Row]:
     with db.get_db() as conn:
         return conn.execute(
@@ -2435,9 +2445,21 @@ CREATE INDEX IF NOT EXISTS idx_att_records_user ON attendance_records(user_id, c
 
 
 def init_attendance_db() -> None:
-    """考勤表（幂等；线上用 migrate_attendance.py）。"""
+    """考勤表（幂等；线上用 migrate_attendance.py）。
+    2026-10-22 二期：sessions 加 group_id（关联点名名单分组，0=不关联），
+    records 加 manual（1=管理员手动补签）——老库走 ALTER 补齐。"""
     with db.get_db() as conn:
         conn.executescript(ATTENDANCE_SCHEMA)
+        s_cols = [str(r["name"]) for r in
+                  conn.execute("PRAGMA table_info(attendance_sessions)").fetchall()]
+        if "group_id" not in s_cols:
+            conn.execute("ALTER TABLE attendance_sessions"
+                         " ADD COLUMN group_id INTEGER NOT NULL DEFAULT 0")
+        r_cols = [str(r["name"]) for r in
+                  conn.execute("PRAGMA table_info(attendance_records)").fetchall()]
+        if "manual" not in r_cols:
+            conn.execute("ALTER TABLE attendance_records"
+                         " ADD COLUMN manual INTEGER NOT NULL DEFAULT 0")
 
 
 def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -2452,13 +2474,14 @@ def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 
 def att_create_session(title: str, lat: float, lng: float, radius_m: int,
-                       creator_id: int, minutes: float) -> int:
+                       creator_id: int, minutes: float, group_id: int = 0) -> int:
     now_ts: float = time.time()
     with db.get_db() as conn:
         cur = conn.execute(
             "INSERT INTO attendance_sessions(title,lat,lng,radius_m,creator_id,status,"
-            " ends_at,created_at) VALUES (?,?,?,?,?, 'open', ?,?)",
-            (title, lat, lng, radius_m, creator_id, now_ts + minutes * 60, now_ts),
+            " ends_at,created_at,group_id) VALUES (?,?,?,?,?, 'open', ?,?,?)",
+            (title, lat, lng, radius_m, creator_id, now_ts + minutes * 60, now_ts,
+             int(group_id)),
         )
         return int(cur.lastrowid)
 
@@ -2470,12 +2493,24 @@ def att_get_session(session_id: int) -> Optional[sqlite3.Row]:
             " JOIN users u ON u.id=s.creator_id WHERE s.id=?", (session_id,)).fetchone()
 
 
+ATT_RETENTION_DAYS: int = 2   # 考勤名单保留时长，过期惰性清除
+
+
 def att_close_expired() -> None:
-    """惰性关闭到期的 open 会话（每次读考勤状态时顺手做）。"""
+    """惰性维护（每次读考勤状态时顺手做）：
+    1. 关闭到期的 open 会话；
+    2. 清除超过 ATT_RETENTION_DAYS 天的场次及其签到名单。"""
+    now_ts: float = time.time()
+    cutoff: float = now_ts - ATT_RETENTION_DAYS * 86400
     with db.get_db() as conn:
         conn.execute(
             "UPDATE attendance_sessions SET status='closed'"
-            " WHERE status='open' AND ends_at<?", (time.time(),))
+            " WHERE status='open' AND ends_at<?", (now_ts,))
+        # 先删子表记录再删场次（不依赖外键级联是否启用）
+        conn.execute(
+            "DELETE FROM attendance_records WHERE session_id IN"
+            " (SELECT id FROM attendance_sessions WHERE created_at<?)", (cutoff,))
+        conn.execute("DELETE FROM attendance_sessions WHERE created_at<?", (cutoff,))
 
 
 def att_open_session() -> Optional[sqlite3.Row]:
@@ -2495,13 +2530,16 @@ def att_close_session(session_id: int) -> None:
 
 
 def att_add_record(session_id: int, user_id: int, lat: float, lng: float,
-                   distance_m: float) -> bool:
-    """写入签到记录；UNIQUE 兜底防重复。返回是否本次新签。"""
+                   distance_m: float, manual: bool = False) -> bool:
+    """写入签到记录；UNIQUE 兜底防重复。返回是否本次新签。
+    manual=True 表示管理员手动补签（坐标取考勤点、距离记 0）。"""
     with db.get_db() as conn:
         cur = conn.execute(
             "INSERT OR IGNORE INTO attendance_records"
-            "(session_id,user_id,lat,lng,distance_m,created_at) VALUES (?,?,?,?,?,?)",
-            (session_id, user_id, lat, lng, distance_m, time.time()),
+            "(session_id,user_id,lat,lng,distance_m,created_at,manual)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (session_id, user_id, lat, lng, distance_m, time.time(),
+             1 if manual else 0),
         )
         return cur.rowcount == 1
 
@@ -2514,12 +2552,33 @@ def att_has_record(session_id: int, user_id: int) -> bool:
 
 
 def att_session_records(session_id: int) -> list[sqlite3.Row]:
-    """某场考勤的签到名单（含距离，按时间升序）。"""
+    """某场考勤的签到名单（含距离/补签标记，按时间升序）。"""
     with db.get_db() as conn:
         return conn.execute(
             "SELECT r.*, u.nickname FROM attendance_records r"
             " JOIN users u ON u.id=r.user_id"
             " WHERE r.session_id=? ORDER BY r.created_at", (session_id,)).fetchall()
+
+
+def att_session_roster(session_id: int, group_id: int) -> list[sqlite3.Row]:
+    """某场考勤关联分组的应到名单对账：
+    按「账号昵称 = 名单姓名」匹配签到记录；
+    每行含 member_id/name/has_account/checked_in/manual/checked_at。
+    同名账号可能有多个：GROUP BY 保证每名成员只占一行，
+    任一同名账号签到即算该成员已签，补签落最早的同名账号。"""
+    with db.get_db() as conn:
+        return conn.execute(
+            "SELECT m.id AS member_id, m.name,"
+            " MIN(u.id) AS user_id,"
+            " MAX(r.id) AS record_id, MAX(r.manual) AS manual,"
+            " MAX(r.created_at) AS checked_at"
+            " FROM class_members m"
+            " LEFT JOIN users u ON u.nickname = m.name"
+            " LEFT JOIN attendance_records r"
+            "   ON r.session_id = ? AND r.user_id = u.id"
+            " WHERE m.group_id = ? AND m.is_active = 1"
+            " GROUP BY m.id, m.name"
+            " ORDER BY m.seat_no, m.id", (session_id, group_id)).fetchall()
 
 
 def att_recent_sessions(limit: int = 20) -> list[sqlite3.Row]:

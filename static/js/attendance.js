@@ -43,8 +43,23 @@
        分别给出可操作的修复指引，而不是一句笼统的"定位失败"。 */
     function locErrorText(err) {
         if (!err || typeof err.code === "undefined") return "未知原因，请重试";
-        if (err.code === 1) return "定位权限被拒绝。请点地址栏左侧的锁形/设置图标 →" +
-            " 网站设置 → 位置信息 → 允许，然后点「重新定位」（微信内打开请改用系统浏览器）";
+        var ua = navigator.userAgent || "";
+        var isIOS = /iPhone|iPad|iPod/.test(ua);
+        var isAndroid = /Android/.test(ua);
+        if (err.code === 1) {
+            if (isIOS) {
+                return "定位权限被拒绝。iPhone 请依次检查：①「设置 → 隐私与安全性 → 定位服务」" +
+                    "总开关要打开；② 同一列表中找到本浏览器（Safari/夸克）→ 选「使用 App 期间」；" +
+                    "③ 回到本页点「重新定位」。若开了「屏幕使用时间」，还需在" +
+                    "「内容与隐私限制 → 定位服务」里选允许更改";
+            }
+            if (isAndroid) {
+                return "定位权限被拒绝。请到「系统设置 → 应用 → 当前浏览器 → 权限 → 位置信息」" +
+                    "选允许，再回到本页点「重新定位」（微信/QQ 内打开请改用系统浏览器）";
+            }
+            return "定位权限被拒绝。请点地址栏左侧的锁形/设置图标 → 网站设置 → 位置信息 →" +
+                " 允许，然后点「重新定位」（微信内打开请改用系统浏览器）";
+        }
         if (err.code === 2) return "暂时获取不到位置（GPS 信号弱）。请到窗边或室外、" +
             " 或打开 Wi-Fi 辅助定位后重试";
         if (err.code === 3) return "定位超时。请确认已开启系统定位服务后重试";

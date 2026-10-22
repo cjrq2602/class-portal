@@ -7,14 +7,14 @@
     <div class="flex-between flex-wrap gap-12">
         <h2>📍 日常考勤</h2>
         <span class="text-faint" style="font-size:var(--fs-12)">
-            发起人定位 100 米范围内自动签到
+            发起人定位 {{ radius_m }} 米范围内自动签到
         </span>
     </div>
     <details class="rules mt-12">
         <summary>考勤规则（点开查看）</summary>
         <ul>
             <li>由有权限的班委发起，发起时以其<b>实时定位</b>为考勤点</li>
-            <li>考勤点 <b>100 米</b>范围内自动签到成功（距离由服务端复核）</li>
+            <li>考勤点 <b>{{ radius_m }} 米</b>范围内自动签到成功（距离由服务端复核）</li>
             <li>时长可选 30 秒 / 1 / 2 / 5 / 10 分钟，到点自动结束</li>
             <li>GPS 有漂移属正常，边缘位置有 30 米精度容差</li>
             <li>每人每场只能签一次；请授权浏览器使用位置信息</li>
@@ -43,7 +43,8 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">window.__ATT__ = {
     logged_in: {{ 'true' if logged_in else 'false' }},
-    can_manage: {{ 'true' if can_manage else 'false' }}
+    can_manage: {{ 'true' if can_manage else 'false' }},
+    radius: {{ radius_m }}
 };</script>
 <script src="/static/js/attendance.js?v={{ static_v }}"></script>
 {% endblock %}

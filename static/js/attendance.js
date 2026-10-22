@@ -242,7 +242,8 @@
                 '<option value="2" selected>2 分钟</option><option value="5">5 分钟</option>' +
                 '<option value="10">10 分钟</option></select>' +
                 '<button class="btn btn--primary" id="att-create">📍 以我的定位发起</button></div>' +
-                '<p class="text-faint mt-8" style="font-size:var(--fs-12)">发起时将获取你的实时定位作为考勤点，半径 100 米 · ' +
+                '<p class="text-faint mt-8" style="font-size:var(--fs-12)">发起时将获取你的实时定位作为考勤点，半径 ' +
+                (CFG.radius || 300) + ' 米 · ' +
                 '<span id="att-loc-state">' + escapeHtml(locStateLine()) + '</span></p>';
         }
         html += '<div class="mt-16"><h3 style="font-size:var(--fs-14)">近期场次</h3>' +

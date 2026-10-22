@@ -24,7 +24,7 @@ from blueprints.admin import require_perm
 
 bp: Blueprint = Blueprint("attendance", __name__)
 
-RADIUS_M: int = 100           # 默认签到半径（需求定死 100 米）
+RADIUS_M: int = 300           # 默认签到半径（2026-10-22 起 100 → 300 米）
 ACCURACY_TOLERANCE_M: float = 30.0   # GPS 精度容差上限
 MAX_TITLE_LEN: int = 30
 DURATION_CHOICES: tuple[float, ...] = (0.5, 1, 2, 5, 10)   # 分钟（0.5 = 30 秒快闪考勤）
@@ -63,7 +63,8 @@ def attendance_page():
     uid: Optional[int] = auth_bp.current_user_id()
     return render_template("attendance.html",
                            can_manage=_can_manage(uid),
-                           logged_in=uid is not None)
+                           logged_in=uid is not None,
+                           radius_m=RADIUS_M)
 
 
 # ============================================================

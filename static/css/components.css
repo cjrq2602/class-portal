@@ -851,6 +851,23 @@ textarea.input { min-height: 88px; resize: vertical; }
     cursor: pointer; font-weight: 600;
 }
 .bgm-toggle--on { background: rgba(79,110,247,0.12); color: var(--c-primary); border-color: transparent; }
+/* 曲目选择与切歌按钮 */
+.bgm-track {
+    max-width: 150px; padding: 4px 6px;
+    border: 1px solid var(--border-1); border-radius: var(--r-8);
+    background: var(--bg-card); color: var(--text-1);
+    font-size: var(--fs-12);
+}
+.bgm-panel__row--btns { gap: 8px; }
+.bgm-mini-btn {
+    flex: 1; padding: 6px 0;
+    border: 1px solid var(--border-1); border-radius: var(--r-8);
+    background: var(--bg-hover); color: var(--text-2);
+    font-size: var(--fs-12); font-weight: 600; cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
+}
+.bgm-mini-btn:hover:not(:disabled) { background: var(--border-1); }
+.bgm-mini-btn:disabled { opacity: 0.45; cursor: default; }
 
 /* ---------- 资源导航（友情链接） ---------- */
 .links-grid {

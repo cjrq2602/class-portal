@@ -147,6 +147,9 @@
     border-radius: var(--r-8);
     background: var(--bg-hover);
 }
+/* 四枚及以上按钮的分段：允许换行，按钮等宽 */
+.set-seg--wrap { flex-wrap: wrap; }
+.set-seg--wrap .set-seg__btn { flex: 1 1 40%; }
 .set-seg__btn {
     flex: 1;
     min-height: 38px;

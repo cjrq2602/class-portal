@@ -1446,3 +1446,47 @@ textarea.input { min-height: 88px; resize: vertical; }
     .pol-term-card, .pol-term { transition: none; }
     .pol-term-card:hover { transform: none; }
 }
+
+/* ============================================================
+   导航栏质感变体（设置面板可选，挂在 html[data-navglass]）
+   default = tokens.css 的 --nav-bg（半透明白 0.72 / 深色 0.72），无需覆写
+   ============================================================ */
+/* 毛玻璃（加强）：更透 + 更强模糊，底下背景图清晰可见 */
+html[data-navglass="frost"] { --nav-bg: rgba(255, 255, 255, 0.42); }
+html[data-navglass="frost"][data-theme="dark"] { --nav-bg: rgba(11, 15, 25, 0.45); }
+html[data-navglass="frost"] .nav,
+html[data-navglass="frost"] .tabbar {
+    backdrop-filter: blur(28px) saturate(200%);
+    -webkit-backdrop-filter: blur(28px) saturate(200%);
+}
+
+/* 深色玻璃：任意主题下均为深色半透明，导航内文字转浅色 */
+html[data-navglass="dark"] { --nav-bg: rgba(15, 20, 35, 0.55); }
+html[data-navglass="dark"] .nav,
+html[data-navglass="dark"] .tabbar { border-color: rgba(255, 255, 255, 0.14); }
+html[data-navglass="dark"] .nav__logo,
+html[data-navglass="dark"] .nav__link,
+html[data-navglass="dark"] .nav__icon-btn,
+html[data-navglass="dark"] .tabbar__item { color: rgba(255, 255, 255, 0.78); }
+html[data-navglass="dark"] .nav__link:hover,
+html[data-navglass="dark"] .nav__icon-btn:hover {
+    background: rgba(255, 255, 255, 0.12); color: #fff;
+}
+html[data-navglass="dark"] .nav__link--active,
+html[data-navglass="dark"] .tabbar__item--active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+/* 彩色玻璃：跟随皮肤主色的淡彩玻璃（换皮肤色即换色调） */
+html[data-navglass="tint"] {
+    --nav-bg: color-mix(in srgb, var(--c-primary) 16%, rgba(255, 255, 255, 0.60));
+}
+html[data-navglass="tint"][data-theme="dark"] {
+    --nav-bg: color-mix(in srgb, var(--c-primary) 26%, rgba(11, 15, 25, 0.62));
+}
+@supports not (background: color-mix(in srgb, red 10%, transparent)) {
+    /* 老浏览器兜底：固定守夜蓝淡彩 */
+    html[data-navglass="tint"] { --nav-bg: rgba(79, 110, 247, 0.16); }
+    html[data-navglass="tint"][data-theme="dark"] { --nav-bg: rgba(79, 110, 247, 0.30); }
+}

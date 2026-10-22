@@ -17,6 +17,7 @@
     const LS_MODE = "portal_mode";
     const LS_SKIN = "portal_skin";
     const LS_BG = "portal_bg";
+    const LS_NAVGLASS = "portal_navglass";
     const LS_LOCALE = "portal_locale";
     const LS_THEME_OLD = "portal_theme";
 
@@ -40,6 +41,9 @@
         "none"
     ];
     const LOCALES = ["zh-CN", "zh-TW"];
+    /* 导航栏质感：default 现有半透明白 / frost 加强毛玻璃 /
+       dark 深色玻璃（导航内文字转浅色）/ tint 主色彩玻璃（跟随皮肤色） */
+    const NAVGLASSES = ["default", "frost", "dark", "tint"];
 
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -61,6 +65,11 @@
     function getBg() {
         const saved = localStorage.getItem(LS_BG);
         return BGS.indexOf(saved) >= 0 ? saved : "aurora";
+    }
+
+    function getNavglass() {
+        const saved = localStorage.getItem(LS_NAVGLASS);
+        return NAVGLASSES.indexOf(saved) >= 0 ? saved : "default";
     }
 
     function getLocale() {
@@ -105,6 +114,12 @@
         }
     }
 
+    function applyNavglass(v, persist) {
+        if (NAVGLASSES.indexOf(v) < 0) v = "default";
+        if (persist) localStorage.setItem(LS_NAVGLASS, v);
+        document.documentElement.dataset.navglass = v;
+    }
+
     function applyLocale(locale, persist) {
         if (LOCALES.indexOf(locale) < 0) locale = "zh-CN";
         if (persist) localStorage.setItem(LS_LOCALE, locale);
@@ -115,6 +130,7 @@
     applyMode(getMode(), false);
     applySkin(getSkin(), false);
     applyBg(getBg(), false);
+    applyNavglass(getNavglass(), false);
     applyLocale(getLocale(), false);
 
     // 系统偏好变化：仅 auto 模式跟随
@@ -125,9 +141,11 @@
     // 暴露给设置面板与其他脚本
     window.PortalAppearance = {
         getMode: getMode, getSkin: getSkin, getBg: getBg, getLocale: getLocale,
+        getNavglass: getNavglass,
         setMode: function (m) { applyMode(m, true); },
         setSkin: function (s) { applySkin(s, true); },
         setBg: function (b) { applyBg(b, true); },
+        setNavglass: function (v) { applyNavglass(v, true); },
         setLocale: function (l) {
             applyLocale(l, true);
             // 简繁转换依赖整页重渲染，切换后直接刷新最稳
@@ -196,6 +214,14 @@
             });
         });
 
+        /* 导航栏质感 */
+        document.querySelectorAll("[data-set-navglass]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                applyNavglass(btn.dataset.setNavglass, true);
+                syncPanel();
+            });
+        });
+
         /* 语言 */
         document.querySelectorAll("[data-set-locale]").forEach((btn) => {
             btn.addEventListener("click", () => {
@@ -220,6 +246,7 @@
             const skin = getSkin();
             const bg = getBg();
             const locale = getLocale();
+            const navglass = getNavglass();
             document.querySelectorAll("[data-set-mode]").forEach((b) => {
                 b.classList.toggle("is-active", b.dataset.setMode === mode);
             });
@@ -228,6 +255,9 @@
             });
             document.querySelectorAll("[data-set-bg]").forEach((b) => {
                 b.classList.toggle("is-active", b.dataset.setBg === bg);
+            });
+            document.querySelectorAll("[data-set-navglass]").forEach((b) => {
+                b.classList.toggle("is-active", b.dataset.setNavglass === navglass);
             });
             document.querySelectorAll("[data-set-locale]").forEach((b) => {
                 b.classList.toggle("is-active", b.dataset.setLocale === locale);

@@ -27,9 +27,11 @@
     const SKINS = ["default", "sakura", "forest", "sunset", "ocean", "mono"];
     /* 背景图清单：与 static/img/bg/bg-<id>.jpg 一一对应；
        none = 无背景（纯色页面）。aurora 为默认。
-       第九期新增 24 张插画图：anime 动漫风景 / animechar 动漫人物 /
-       game 游戏人物 / nature 自然 / wild 旷野 / cozy 温馨，各 4 张。 */
+       第九期新增 24 张横屏插画图：anime 动漫风景 / animechar 动漫人物 /
+       game 游戏人物 / nature 自然 / wild 旷野 / cozy 温馨，各 4 张。
+       2026-10-22 再增 24 张竖屏手机版（m- 前缀，同上六风格各 4 张）。 */
     const BGS = [
+        /* 电脑版（横屏 1536×808） */
         "aurora", "sakura", "forest", "sunset", "ocean", "mono",
         "mint", "lavender", "peach", "sky", "lilac", "lime",
         "rosegold", "butter", "glacier", "matcha", "taro", "coral",
@@ -40,6 +42,13 @@
         "nature1", "nature2", "nature3", "nature4",
         "wild1", "wild2", "wild3", "wild4",
         "cozy1", "cozy2", "cozy3", "cozy4",
+        /* 手机版（竖屏 1024×1824），m- 前缀 */
+        "m-anime1", "m-anime2", "m-anime3", "m-anime4",
+        "m-animechar1", "m-animechar2", "m-animechar3", "m-animechar4",
+        "m-game1", "m-game2", "m-game3", "m-game4",
+        "m-nature1", "m-nature2", "m-nature3", "m-nature4",
+        "m-wild1", "m-wild2", "m-wild3", "m-wild4",
+        "m-cozy1", "m-cozy2", "m-cozy3", "m-cozy4",
         "none"
     ];
     const LOCALES = ["zh-CN", "zh-TW"];

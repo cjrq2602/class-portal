@@ -75,6 +75,9 @@ ROLES: dict[str, tuple[str, list[str]]] = {
     #（作业管理在 /admin 后台，故需 admin.access；后台只显示有权限的模块）
     "monitor": ("班长", ["admin.access", "attendance.manage", "homework.manage",
                          "duty.manage", "audit.view"]),
+    # 团支书：全部具体权限（与 root 同级），唯一没有的是 superadmin 的
+    # admin.full 超管特权——即「一人之下」的第二管理员
+    "league": ("团支书", [c for c, _ in PERMISSIONS]),
 }
 
 # ---------------- 管理员（用户名 → (角色, 默认昵称)） ----------------

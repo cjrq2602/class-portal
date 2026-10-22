@@ -15,12 +15,12 @@
 (function () {
     /* 曲目清单：file 相对站点根，name 显示在面板里 */
     var TRACKS = [
-        { id: "calm",      file: "/static/audio/bgm-calm.mp3",      name: "自作 · 轻音乐" },
-        { id: "gufeng",    file: "/static/audio/bgm-gufeng.mp3",    name: "自作 · 古风" },
-        { id: "summer",    file: "/static/audio/bgm-summer.mp3",    name: "Summer Melody（夏日旋律）" },
-        { id: "afterrain", file: "/static/audio/bgm-afterrain.mp3", name: "After The Rain（雨后）" },
-        { id: "concert",   file: "/static/audio/bgm-concert.mp3",   name: "她来听我的演唱会" },
-        { id: "ocean",     file: "/static/audio/bgm-ocean.mp3",     name: "Oceanfront（海滨）" },
+        { id: "calm",     file: "/static/audio/bgm-calm.mp3",     name: "自作 · 轻音乐" },
+        { id: "gufeng",   file: "/static/audio/bgm-gufeng.mp3",   name: "自作 · 古风" },
+        { id: "beach",    file: "/static/audio/bgm-beach.mp3",    name: "Beach2（热带海滩）" },
+        { id: "whisper",  file: "/static/audio/bgm-whisper.mp3",  name: "Whisper3（森林细语）" },
+        { id: "raindrop", file: "/static/audio/bgm-raindrop.mp3", name: "RainDrop（雨滴钢琴）" },
+        { id: "ocean",    file: "/static/audio/bgm-ocean.mp3",    name: "Oceanfront（海滨）" },
     ];
 
     var LS_ON = "bgm_on", LS_VOL = "bgm_vol", LS_TRACK = "bgm_track";
